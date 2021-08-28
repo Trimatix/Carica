@@ -1,5 +1,8 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from typing import Dict, List, Set, Union
+
+PrimativeType = Union[int, float, str, bool, List["PrimativeType"], Dict["PrimativeType", "PrimativeType"], Set["PrimativeType"]] # type: ignore
 
 
 class ISerializable(ABC):
@@ -8,22 +11,22 @@ class ISerializable(ABC):
     """
     
     @abstractmethod
-    def toDict(self, **kwargs) -> dict:
-        """Serialize this object into dictionary format, to be recreated completely.
+    def serialize(self, **kwargs) -> PrimativeType:
+        """Serialize this object into primative types (likely a dictionary, e.g JSON), to be recreated completely.
 
-        :return: A dictionary containing all information needed to recreate this object
-        :rtype: dict
+        :return: A primative (likely a dictionary) containing all information needed to recreate this object
+        :rtype: PrimativeType
         """
         raise NotImplementedError()
 
 
     @abstractmethod
     @classmethod
-    def fromDict(cls, data: dict, **kwargs) -> ISerializable:
-        """Recreate a dictionary-serialized ISerializable object 
+    def deserialize(cls, data: PrimativeType, **kwargs) -> ISerializable:
+        """Recreate a serialized ISerializable object
 
-        :param dict data: A dictionary containing all information needed to recreate the serialized object
-        :return: A new object as specified by the attributes in data
+        :param PrimativeType data: A primative (likely a dictionary) containing all information needed to recreate the serialized object
+        :return: A new object as specified by data
         :rtype: ISerializable
         """
         raise NotImplementedError()
