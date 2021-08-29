@@ -8,7 +8,24 @@ CFG_FILE_EXT = ".toml"
 
 
 def _partialModuleVarNames(module: ModuleType) -> List[str]:
-    """Estimate
+    """Estimate a list of variable names defined in module.
+    Attempts to ignore other name types, such as functions, classes and imports.
+    Names cannot be indented, and multiple assignment is not supported - variable declarations must be on their own lines.
+
+    This function simply iterates over the module's tokens, and does not build an AST.
+    This means that certain name definition structures will result in false positives/negatives.
+    This behaviour has not been extensively tested, but once such false positive has been identified:
+    When invoking a callable (such as a class or function) with a keyword argument on a new, unindented line, the argument
+    name will be falsely identified as a variable name. E.g:
+    ```
+    my_variable = dict(key1=value1,
+    key2=value2)
+    ```
+    produces `my_variable` and `key2` as variable names.
+
+    :param ModuleType module: The module from which to estimate variable names
+    :return: An estimated list of variable names defined in module. See above for details and limitations.
+    :rtype: List[str]
     """
     with tokenize.open(module.__file__) as f:
         tokens = tokenize.generate_tokens(f.readline)
