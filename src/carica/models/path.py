@@ -1,8 +1,8 @@
 from typing import cast
-from carica.interface.ISerializable import ISerializable, PrimativeType
+from carica.interface.ISerializable import SerializableType, PrimativeType
 from pathlib import Path
 
-class SerializablePath(ISerializable, Path):
+class SerializablePath(SerializableType, Path):
     """A serializable path intended to be treated as a string.
     This class serializes into a usable string.
     """
@@ -17,7 +17,7 @@ class SerializablePath(ISerializable, Path):
 
 
     @classmethod
-    def deserialize(cls, data: PrimativeType, **kwargs) -> ISerializable:
+    def deserialize(cls, data: PrimativeType, **kwargs) -> SerializableType:
         """Form a SerializablePath from a string. Separation of the path into parts is handled by pathlib.Path logic.
 
         :param str data: The path to deserialize, as an os.sep-separated string of path parts.

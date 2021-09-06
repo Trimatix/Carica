@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from carica.interface.ISerializable import ISerializable, PrimativeType
+from carica.interface.ISerializable import SerializableType, ISerializable, PrimativeType
 from typing import Any, Dict, cast
 
 
@@ -28,7 +28,7 @@ class SerializableDataClass(ISerializable):
         :return: True if at least one field is annotated as a Serializable type, False otherwise
         :rtype: bool
         """
-        return any(issubclass(cls._typeOfFieldNamed(k), ISerializable) for k in cls.__dataclass_fields__) # type: ignore
+        return any(issubclass(cls._typeOfFieldNamed(k), SerializableType) for k in cls.__dataclass_fields__) # type: ignore
 
     
     def serialize(self, **kwargs) -> Dict[str, PrimativeType]:
@@ -41,7 +41,7 @@ class SerializableDataClass(ISerializable):
 
         for k in self.__dataclass_fields__: # type: ignore
             v = getattr(self, k)
-            if isinstance(v, ISerializable):
+            if isinstance(v, SerializableType):
                 data[k] = v.serialize(**kwargs)
             else:
                 data[k] = v
@@ -63,7 +63,7 @@ class SerializableDataClass(ISerializable):
 
         if deserializeValues and cls._hasISerializableField():
             for k, v in data.items():
-                if issubclass(cls._typeOfFieldNamed(k), ISerializable) and not isinstance(v, ISerializable):
+                if issubclass(cls._typeOfFieldNamed(k), SerializableType) and not isinstance(v, SerializableType):
                     data[k] = cls._typeOfFieldNamed(k).deserialize(v, **kwargs)
             
             data = cast(Dict[str, Any], data)
