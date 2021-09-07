@@ -44,10 +44,10 @@ class SerializableDataClass(ISerializable):
             v = getattr(self, k)
             if isinstance(v, SerializableType):
                 data[k] = v.serialize(**kwargs)
-            elif deepTypeChecking and not objectIsDeepSerializable(v):
+            elif not objectIsShallowSerializable(v):
                 raise TypeError(f"Field '{k}' is of non-serializable type: {type(v).__name__}")
-            elif not deepTypeChecking and not objectIsShallowSerializable(v):
-                raise TypeError(f"Field '{k}' is of non-serializable type, or has a non-serializable member. Type of {k}: {type(v).__name__}")
+            elif deepTypeChecking and not objectIsDeepSerializable(v):
+                raise TypeError(f"Field '{k}' has a non-serializable member object")
             else:
                 data[k] = v
 
