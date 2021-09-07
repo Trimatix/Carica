@@ -1,30 +1,31 @@
-from typing import cast
-from carica.interface.Serializable import SerializableType, PrimativeType
+from carica.interface import ISerializable, PrimativeType
 from pathlib import Path
 
-class SerializablePath(SerializableType, Path):
+class SerializablePath(ISerializable, Path):
     """A serializable path intended to be treated as a string.
     This class serializes into a usable string.
     """
 
-    def serialize(self, **kwargs) -> PrimativeType:
+    def serialize(self, **kwargs) -> str:
         """Return this path as a string.
 
         :return: The path as a string
-        :rtype: str
+        :rtype: strs
         """
         return str(self)
 
 
     @classmethod
-    def deserialize(cls, data: PrimativeType, **kwargs) -> SerializableType:
+    def deserialize(cls, data: PrimativeType, **kwargs) -> "SerializablePath":
         """Form a SerializablePath from a string. Separation of the path into parts is handled by pathlib.Path logic.
 
         :param str data: The path to deserialize, as an os.sep-separated string of path parts.
         :return: A new SerializablePath representing data
         :rtype: SerializablePath
         """
-        return SerializablePath(cast(str, data))
+        if not isinstance(data, str):
+            raise TypeError(f"Invalid type for parameter data. Expected str, received {type(data).__name__}")
+        return SerializablePath(data)
 
 
     def __add__(self, other: object) -> "SerializablePath":

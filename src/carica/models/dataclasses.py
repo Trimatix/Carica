@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from carica.interface.Serializable import SerializableType, ISerializable, PrimativeType
+from carica.interface import SerializableType, ISerializable, primativeTypes, PrimativeType, objectIsShallowSerializable, objectIsDeepSerializable
 from typing import Any, Dict, cast
 
 
@@ -31,9 +31,10 @@ class SerializableDataClass(ISerializable):
         return any(issubclass(cls._typeOfFieldNamed(k), SerializableType) for k in cls.__dataclass_fields__) # type: ignore
 
     
-    def serialize(self, **kwargs) -> Dict[str, PrimativeType]:
+    def serialize(self, deepTypeChecking: bool = False, **kwargs) -> Dict[str, PrimativeType]:
         """Serialize this object into a dictionary, to be recreated completely.
 
+        :param bool deepTypeChecking: Whether to ensure serializability of member objects recursively (Default False)
         :return: A dictionary mapping field names to serialized values
         :rtype: Dict[str, PrimativeType]
         """
@@ -43,6 +44,10 @@ class SerializableDataClass(ISerializable):
             v = getattr(self, k)
             if isinstance(v, SerializableType):
                 data[k] = v.serialize(**kwargs)
+            elif deepTypeChecking and not objectIsDeepSerializable(v):
+                raise TypeError(f"Field '{k}' is of non-serializable type: {type(v).__name__}")
+            elif not deepTypeChecking and not objectIsShallowSerializable(v):
+                raise TypeError(f"Field '{k}' is of non-serializable type, or has a non-serializable member. Type of {k}: {type(v).__name__}")
             else:
                 data[k] = v
 
@@ -59,10 +64,13 @@ class SerializableDataClass(ISerializable):
         :return: A new object as specified by data
         :rtype: SerializableDataClass
         """
-        data = cast(Dict[str, PrimativeType], data)
+        if not isinstance(data, dict):
+            raise TypeError(f"Invalid type for parameter data. Expected Dict[str, PrimativeType], received {type(data).__name__}")
 
         if deserializeValues and cls._hasISerializableField():
             for k, v in data.items():
+                if not isinstance(k, str):
+                    raise TypeError(f"Invalid serialized {cls.__name__} key '{k}' Expected str, received {type(data).__name__}")
                 if issubclass(cls._typeOfFieldNamed(k), SerializableType) and not isinstance(v, SerializableType):
                     data[k] = cls._typeOfFieldNamed(k).deserialize(v, **kwargs)
             
