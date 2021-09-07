@@ -1,8 +1,9 @@
 from types import ModuleType
 import toml
 import os
-from typing import Dict, Any, List, Tuple, cast
+from typing import List
 import tokenize
+from carica.interface import SerializableType, objectIsDeepSerializable, objectIsShallowSerializable
 
 CFG_FILE_EXT = ".toml"
 DISALLOWED_TOKEN_TYPES = {tokenize.INDENT}
@@ -59,7 +60,7 @@ def _partialModuleVarNames(module: ModuleType) -> List[str]:
     return moduleVarNames
 
 
-def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FILE_EXT) -> str:
+def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FILE_EXT, deepTypeChecking: bool = True, **serializerKwargs) -> str:
     """Create a config file containing all configurable variables with their default values.
     The name of the generated file may optionally be specified.
 
@@ -70,6 +71,7 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
 
     :param ModuleType cfgModule: Module to convert to toml
     :param str fileName: Path to the file to generate (Default "defaultCfg.toml")
+    :param bool deepTypeChecking: Whether to ensure serializability of Serializable variables recursively (Default True)
     :return: path to the generated config file
     :rtype: str
     :raise ValueError: If fileName does not end in CFG_FILE_EXT
@@ -96,18 +98,23 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
     cfgPath += CFG_FILE_EXT
 
     # Read default config values
-    defaults = {varname: varvalue for varname, varvalue in vars(cfgModule).items() if varname not in ignoredVarNames}
-    # Read default emoji values
-    for varname in emojiVars:
-        
-        defaults["defaultEmojis"][varname] = cast(UninitializedBasedEmoji, cfgModule.defaultEmojis[varname]).value
-    # Read default emoji list values
-    for varname in emojiListVars:
-        working = []
-        for item in defaults["defaultEmojis"][varname]:
-            working.append(item.value)
+    defaults = {k: getattr(cfgModule, k) for k in _partialModuleVarNames(cfgModule) if k in cfgModule.__dict__}
+    
+    # Serialize serializable objects and reject non-serializable/non-primative variables
+    for varName, varValue in defaults.items():
+        varState = "Variable"
+        if isinstance(varValue, SerializableType):
+            if not objectIsShallowSerializable(varValue):
+                raise TypeError(f"Variable '{varName}' is of non-serializable type: {type(varValue).__name__}")
+            elif deepTypeChecking and not objectIsDeepSerializable(varValue):
+                raise TypeError(f"Variable '{varName}' has a non-serializable member object")
+            defaults[varName] = varValue.serialize(**serializerKwargs)
+            varState = "Post-serialize variable"
 
-        defaults["defaultEmojis"][varname] = working
+        if not objectIsShallowSerializable(varValue):
+            raise TypeError(f"{varState} '{varName}' is of a non-serializable type: {type(varValue).__name__}")
+        elif deepTypeChecking and not objectIsDeepSerializable(varValue):
+            raise TypeError(f"{varState} '{varName}' has a non-serializable member object")
 
     # Dump to toml and write to file
     with open(cfgPath, "w", encoding="utf-8") as f:
