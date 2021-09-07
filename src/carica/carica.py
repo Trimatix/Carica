@@ -5,6 +5,21 @@ from typing import Dict, Any, List, Tuple, cast
 import tokenize
 
 CFG_FILE_EXT = ".toml"
+DISALLOWED_TOKEN_TYPES = {tokenize.INDENT}
+DISALLOWED_TOKEN_TYPE_VALUES = {tokenize.NAME: {"from", "import"}}
+LINE_DELIMITER_TOKEN_TYPES = {tokenize.NL, tokenize.NEWLINE}
+
+
+def tokenDisallowed(token: tokenize.TokenInfo) -> bool:
+    """Decide whether or not a token can be present in avariable assignment line.
+    The return value is the inverse of what you would expect: True if the token can NOT be part of a variable assignment line.
+
+    :param tokenize.TokenInfo token: The token to check
+    :return: True if the token is an ILLEGAL part of a variable assignment, False if the token is LEGAL.
+    :rtype: bool
+    """
+    return token.type in DISALLOWED_TOKEN_TYPES or \
+        (token.type in DISALLOWED_TOKEN_TYPE_VALUES and token.string in DISALLOWED_TOKEN_TYPE_VALUES[token.type])
 
 
 def _partialModuleVarNames(module: ModuleType) -> List[str]:
@@ -30,14 +45,12 @@ def _partialModuleVarNames(module: ModuleType) -> List[str]:
     with tokenize.open(module.__file__) as f:
         tokens = tokenize.generate_tokens(f.readline)
         moduleVarNames: List[str] = []
-        currentLine: List[tuple] = []
+        currentLine: List[tokenize.TokenInfo] = []
         for token in tokens:
-            if currentLine == [] and token[0] == tokenize.INDENT:
+            if currentLine == [] and tokenDisallowed(token):
                 continue
-            elif currentLine == [] and token[0] == tokenize.NAME and token[1] in ("from", "import"):
-                continue
-            elif token[0] in (tokenize.NEWLINE, tokenize.NL):
-                if currentLine[0][0] == tokenize.NAME and any(t[0] == tokenize.OP and t[1] == "=" for t in currentLine):
+            elif token.type in LINE_DELIMITER_TOKEN_TYPES:
+                if currentLine[0].type == tokenize.NAME and any(t[0] == tokenize.OP and t[1] == "=" for t in currentLine):
                     moduleVarNames.append(currentLine[0][1])
                 currentLine = []
             else:
