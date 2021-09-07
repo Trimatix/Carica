@@ -1,7 +1,7 @@
 from types import ModuleType
 import toml
 import os
-from typing import List
+from typing import List, Type
 import tokenize
 from carica.interface import SerializableType, objectIsDeepSerializable, objectIsShallowSerializable
 
@@ -105,9 +105,7 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
     for varName, varValue in defaults.items():
         varState = "Variable"
         if isinstance(varValue, SerializableType):
-            if not objectIsShallowSerializable(varValue):
-                raise TypeError(f"Variable '{varName}' is of non-serializable type: {type(varValue).__name__}")
-            elif deepTypeChecking and not objectIsDeepSerializable(varValue):
+            if deepTypeChecking and not objectIsDeepSerializable(varValue):
                 raise TypeError(f"Variable '{varName}' has a non-serializable member object")
             defaults[varName] = varValue.serialize(**serializerKwargs)
             varState = "Post-serialize variable"
@@ -119,7 +117,13 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
 
     # Dump to toml and write to file
     with open(cfgPath, "w", encoding="utf-8") as f:
-        f.write(toml.dumps(defaults))
+        try:
+            f.write(toml.dumps(defaults))
+        except TypeError as e:
+            cause = e.__cause__
+            args = e.args
+            print("DEFAULTS\n",defaults, sep="")
+            raise e
 
     # Print and return path to new file
     print("Created " + cfgPath)
