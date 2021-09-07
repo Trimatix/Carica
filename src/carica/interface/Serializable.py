@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Dict, List, Set, Union, Protocol, runtime_checkable
 
-PrimativeType = Union[int, float, str, bool, List["PrimativeType"], Dict["PrimativeType", "PrimativeType"], Set["PrimativeType"]] # type: ignore
+PrimativeType = Union[int, float, str, bool, List["PrimativeType"], Dict[str, "PrimativeType"], Set["PrimativeType"]] # type: ignore
 
 
 @runtime_checkable
