@@ -106,8 +106,8 @@ class ISerializable(ABC):
         raise NotImplementedError()
 
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def deserialize(cls, data: PrimativeType, **kwargs) -> ISerializable:
         """Recreate a serialized ISerializable object
 
