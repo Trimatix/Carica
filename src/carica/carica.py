@@ -51,9 +51,10 @@ def _partialModuleVarNames(module: ModuleType) -> List[str]:
             if currentLine == [] and tokenDisallowed(token):
                 continue
             elif token.type in LINE_DELIMITER_TOKEN_TYPES:
-                if currentLine[0].type == tokenize.NAME and any(t[0] == tokenize.OP and t[1] == "=" for t in currentLine):
-                    moduleVarNames.append(currentLine[0][1])
-                currentLine = []
+                if currentLine:
+                    if currentLine[0].type == tokenize.NAME and any(t[0] == tokenize.OP and t[1] == "=" for t in currentLine):
+                        moduleVarNames.append(currentLine[0][1])
+                    currentLine = []
             else:
                 currentLine.append(token)
         
