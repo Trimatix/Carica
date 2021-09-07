@@ -1,5 +1,5 @@
 from typing import cast
-from carica.interface.ISerializable import SerializableType, PrimativeType
+from carica.interface.Serializable import SerializableType, PrimativeType
 from pathlib import Path
 
 class SerializablePath(SerializableType, Path):
