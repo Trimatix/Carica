@@ -3,9 +3,10 @@ from abc import ABC, abstractmethod
 from typing import Iterable, Mapping, Union, Protocol, runtime_checkable
 
 # All types acceptable as toml data
+# Iterable includes set, list and str. It also includes dict!
 PrimativeType = Union[int, float, str, bool, Iterable["PrimativeType"], Mapping[str, "PrimativeType"]] # type: ignore
 # PrimativeType as a shallow set
-primativeTypes = {int, float, str, bool, Iterable["PrimativeType"], Mapping[str, "PrimativeType"]}
+primativeTypes = {int, float, str, bool, Iterable, Mapping}
 
 
 @runtime_checkable

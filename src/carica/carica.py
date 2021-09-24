@@ -75,6 +75,17 @@ def _serialize(o: Any, path: List[Union[str, int]], depthLimit=20, serializerKwa
         return _serialize(o.serialize(**serializerKwargs), path + ["[serialize]"], depthLimit=depthLimit,
                             serializerKwargs=serializerKwargs)
 
+    # o is a mapping, serialize each value
+    elif isinstance(o, Mapping):
+        serializedDict: Dict[str, PrimativeType] = {}
+        for k, v in o.items():
+            # ensure keys are str
+            if not isinstance(k, str):
+                raise exceptions.NonStringMappingKey(k, len(path)-1, path)
+
+            serializedDict[k] = _serialize(v, path + [k], depthLimit=depthLimit, serializerKwargs=serializerKwargs)
+        return serializedDict
+
     # o is an iterable, serialize each element
     if isinstance(o, Iterable) and not isinstance(o, str):
         serializedList: List[PrimativeType] = []
@@ -88,17 +99,6 @@ def _serialize(o: Any, path: List[Union[str, int]], depthLimit=20, serializerKwa
                 raise exceptions.MultiTypeList(o, len(path)-1, path)
 
         return serializedList
-
-    # o is a mapping, serialize each value
-    elif isinstance(o, Mapping):
-        serializedDict: Dict[str, PrimativeType] = {}
-        for k, v in o.items():
-            # ensure keys are str
-            if not isinstance(k, str):
-                raise exceptions.NonStringMappingKey(k, len(path)-1, path)
-
-            serializedDict[k] = _serialize(v, path + [k], depthLimit=depthLimit, serializerKwargs=serializerKwargs)
-        return serializedDict
 
     # o is just a normal primative, return it as is
     elif objectIsShallowPrimative(o):
@@ -158,3 +158,63 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
     # Print and return path to new file
     print("Created " + cfgPath)
     return cfgPath
+
+
+# TODO: This code has been copied in pretty much 1-1 from bountybot, refactor it and test it
+def loadCfg(cfgModule: ModuleType, cfgFile: str, raiseOnUnknownVar: bool = True):
+    """Load the values from a specified config file into attributes of the python cfg module.
+    All config attributes are optional.
+
+    :param str cfgFile: Path to the file to load. Can be relative or absolute.
+    """
+    # Ensure the given config is toml
+    if not cfgFile.endswith(CFG_FILE_EXT):
+        raise ValueError("config files must be TOML")
+
+    # Load from toml to dictionary
+    with open(cfgFile, "r", encoding="utf-8") as f:
+        config = toml.loads(f.read())
+
+    # Read default config values
+    defaults = {k: getattr(cfgModule, k) for k in _partialModuleVarNames(cfgModule) if k in cfgModule.__dict__}
+
+    # Assign config values to cfg attributes
+    for varname in config:
+        # Validate attribute names
+        if varname not in defaults:
+            if raiseOnUnknownVar:
+                raise NameError("Unrecognised config variable name: " + varname)
+            else:
+                print("[WARNING] Ignoring unrecognised config variable name: " + varname)
+
+        else:
+            # Get default value for variable
+            default = getattr(cfgModule, varname)
+            newvalue = config[varname]
+            if isinstance(default, SerializableType):
+
+
+
+
+                # TODO: this threw an error before saying deserialize got no arguments, so i passed in the class as well 
+                newvalue = type(default).deserialize(type(default), newvalue)
+
+
+
+
+            # Ensure new value is of the correct type
+            if type(config[varname]) != type(default):
+                try:
+                    # Attempt casts for incorrect types - useful for things like ints instead of floats.
+                    config[varname] = type(default)(config[varname])
+                    print("[WARNING] Casting config variable " + varname + " from " + type(config[varname]).__name__ \
+                            + " to " + type(default).__name__)
+                except Exception:
+                    # Where a variable is of the wrong type and cannot be casted, raise an exception.
+                    raise TypeError("Unexpected type for config variable " + varname + ": Expected " \
+                                    + type(default).__name__ + ", received " + type(config[varname]).__name__)
+
+            setattr(cfgModule, varname, config[varname])
+
+    # No errors encountered
+    print("Config successfully loaded: " + cfgFile)

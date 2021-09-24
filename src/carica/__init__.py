@@ -1,3 +1,3 @@
-from .carica import makeDefaultCfg
+from .carica import makeDefaultCfg, loadCfg
 from .models import *
 from .interface import *
