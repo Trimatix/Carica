@@ -1,11 +1,10 @@
 from types import ModuleType
 import toml
 import os
-from typing import Any, Dict, List, Type, Union
+from typing import Any, Dict, List, Union
 import tokenize
 from carica.interface import SerializableType, PrimativeType
-from carica.typeChecking import objectIsShallowSerializable, objectIsShallowPrimative, \
-                                raiseForDeepNonSerializable, raiseForShallowNonSerializable
+from carica.typeChecking import objectIsShallowPrimative
 from carica import exceptions
 
 CFG_FILE_EXT = ".toml"
@@ -65,6 +64,8 @@ def _partialModuleVarNames(module: ModuleType) -> List[str]:
 
 
 def _serialize(o: Any, path: List[Union[str, int]], depthLimit=20, serializerKwargs={}) -> PrimativeType:
+    """Internal recursive method to serialize any serializable object, or throw exceptions with useful key trace info
+    """
     # Check recursion depth
     if len(path) > depthLimit:
         raise RecursionError()
