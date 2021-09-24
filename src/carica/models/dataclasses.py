@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from carica.interface import SerializableType, ISerializable, primativeTypes, PrimativeType, objectIsShallowSerializable, objectIsDeepSerializable
+from carica.interface import SerializableType, ISerializable, PrimativeType
+from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable
 from typing import Any, Dict, cast
 
 
