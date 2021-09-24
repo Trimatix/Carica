@@ -68,3 +68,10 @@ class NonStringMappingKey(KeyTracedException):
     """Exception to be raised when attempting to serialize a mapping (dict) which has a key that is not a str.
     """
     pass
+
+
+class MultiTypeList(KeyTracedException):
+    """Exception to be raised when attempting to serialize a list containing both tables (dicts) and non-table types.
+    """
+    def __str__(self) -> str:
+        return f"List contains both dicts and non-dict types {self.formatPathInfo()}"
