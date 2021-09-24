@@ -1,9 +1,12 @@
 from types import ModuleType
 import toml
 import os
-from typing import List, Type
+from typing import Any, Dict, List, Type, Union
 import tokenize
-from carica.interface import SerializableType, objectIsDeepSerializable, objectIsShallowSerializable
+from carica.interface import SerializableType, PrimativeType
+from carica.typeChecking import objectIsShallowSerializable, objectIsShallowPrimative, \
+                                raiseForDeepNonSerializable, raiseForShallowNonSerializable
+from carica import exceptions
 
 CFG_FILE_EXT = ".toml"
 DISALLOWED_TOKEN_TYPES = {tokenize.INDENT}
@@ -61,7 +64,50 @@ def _partialModuleVarNames(module: ModuleType) -> List[str]:
     return moduleVarNames
 
 
-def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FILE_EXT, deepTypeChecking: bool = True, **serializerKwargs) -> str:
+def _serialize(o: Any, path: List[Union[str, int]], depthLimit=20, serializerKwargs={}) -> PrimativeType:
+    # Check recursion depth
+    if len(path) > depthLimit:
+        raise RecursionError()
+
+    # o is directly serializable, serialize it and return that
+    if isinstance(o, SerializableType):
+        return _serialize(o.serialize(**serializerKwargs), path + ["[serialize]"], depthLimit=depthLimit,
+                            serializerKwargs=serializerKwargs)
+
+    # o is an iterable, serialize each element
+    if isinstance(o, list) or isinstance(o, set):
+        serializedList: List[PrimativeType] = []
+        for i in o:
+            serializedList.append(_serialize(i, path + [i], depthLimit=depthLimit, serializerKwargs=serializerKwargs))
+        
+        # ensure serialized lists contain either tables or non-dict primatives, but not both
+        if len(serializedList) > 1:
+            if (isinstance(serializedList[0], dict) and any(not isinstance(i, dict) for i in serializedList[1:])) or \
+                    (not isinstance(serializedList[0], dict) and any(isinstance(i, dict) for i in serializedList[1:])):
+                raise exceptions.MultiTypeList(o, len(path)-1, path)
+
+        return serializedList
+
+    # o is a mapping, serialize each value
+    elif isinstance(o, dict):
+        serializedDict: Dict[str, PrimativeType] = {}
+        for k, v in o.items():
+            # ensure keys are str
+            if not isinstance(k, str):
+                raise exceptions.NonStringMappingKey(k, len(path)-1, path)
+
+            serializedDict[k] = _serialize(v, path + [k], depthLimit=depthLimit, serializerKwargs=serializerKwargs)
+        return serializedDict
+
+    # o is just a normal primative, return it as is
+    elif objectIsShallowPrimative(o):
+        return o
+
+    # unable to match serializing method, exception time
+    raise exceptions.NonSerializableObject(o, len(path)-1, path)
+
+
+def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FILE_EXT, **serializerKwargs) -> str:
     """Create a config file containing all configurable variables with their default values.
     The name of the generated file may optionally be specified.
 
@@ -72,7 +118,6 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
 
     :param ModuleType cfgModule: Module to convert to toml
     :param str fileName: Path to the file to generate (Default "defaultCfg.toml")
-    :param bool deepTypeChecking: Whether to ensure serializability of Serializable variables recursively (Default True)
     :return: path to the generated config file
     :rtype: str
     :raise ValueError: If fileName does not end in CFG_FILE_EXT
@@ -103,27 +148,11 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
     
     # Serialize serializable objects and reject non-serializable/non-primative variables
     for varName, varValue in defaults.items():
-        varState = "Variable"
-        if isinstance(varValue, SerializableType):
-            if deepTypeChecking and not objectIsDeepSerializable(varValue):
-                raise TypeError(f"Variable '{varName}' has a non-serializable member object")
-            defaults[varName] = varValue.serialize(**serializerKwargs)
-            varState = "Post-serialize variable"
-
-        if not objectIsShallowSerializable(varValue):
-            raise TypeError(f"{varState} '{varName}' is of a non-serializable type: {type(varValue).__name__}")
-        elif deepTypeChecking and not objectIsDeepSerializable(varValue):
-            raise TypeError(f"{varState} '{varName}' has a non-serializable member object")
+        defaults[varName] = _serialize(varValue, [varName], serializerKwargs=serializerKwargs)
 
     # Dump to toml and write to file
     with open(cfgPath, "w", encoding="utf-8") as f:
-        try:
-            f.write(toml.dumps(defaults))
-        except TypeError as e:
-            cause = e.__cause__
-            args = e.args
-            print("DEFAULTS\n",defaults, sep="")
-            raise e
+        f.write(toml.dumps(defaults))
 
     # Print and return path to new file
     print("Created " + cfgPath)
