@@ -146,20 +146,20 @@ def raiseForShallowNonSerializable(o: Any) -> None:
         raise exceptions.NonSerializableObject(o)
 
 
-def _recurseRaiseForDeepNonSerializable(o: Any, depth: int, path: List[Union[str, int]]) -> None:
+def _recurseRaiseForDeepNonSerializable(o: Any, path: List[Union[str, int]]) -> None:
     """Internal recursive method for use exclusively by raiseForDeepNonSerializable.
     """
     if isinstance(o, list) or isinstance(o, set):
         for i in o:
-            _recurseRaiseForDeepNonSerializable(i, depth+1, path + [i])
+            _recurseRaiseForDeepNonSerializable(i, path + [i])
     elif isinstance(o, dict):
         for k, v in o.items():
             if not isinstance(k, str):
-                raise exceptions.NonStringMappingKey(k, depth, path)
-            _recurseRaiseForDeepNonSerializable(v, depth+1, path + [k])
+                raise exceptions.NonStringMappingKey(k, len(path), path)
+            _recurseRaiseForDeepNonSerializable(v, path + [k])
     else:
         if not objectIsShallowSerializable(o):
-            raise exceptions.NonSerializableObject(o, depth, path)
+            raise exceptions.NonSerializableObject(o, len(path), path)
 
 
 def raiseForDeepNonSerializable(o: Any) -> None:
@@ -176,4 +176,4 @@ def raiseForDeepNonSerializable(o: Any) -> None:
     :raise exceptions.NonSerializableObject: If a non-serializable object is encountered at any level
     :raise exceptions.NonStringMappingKey: If a non-str mapping key is encountered at any level
     """
-    _recurseRaiseForDeepNonSerializable(o, 0, [])
+    _recurseRaiseForDeepNonSerializable(o, [])
