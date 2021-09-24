@@ -55,7 +55,7 @@ class KeyTracedException(Exception):
 
 
     def __str__(self) -> str:
-        return f"{repr(self.o)} {self.formatPathInfo()}"
+        return f"object '{repr(self.o)}' {self.formatPathInfo()}"
 
 
 class NonSerializableObject(KeyTracedException):
