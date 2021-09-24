@@ -1,6 +1,16 @@
-from typing import Any, List, Union
+from typing import Any, Iterable, List, Mapping, Union
 from carica.interface import primativeTypes, serializableTypes
 from carica import exceptions
+
+
+def objectIsObjectIterable(o: Any) -> bool:
+    """Decide whether o is an iterable of objects.
+    like typing.Iterable, but more restricted for serializabiliy checking.
+
+    :return: True if o is of a type considered to be an iterable of objects, but not a string
+    :rtype: False
+    """
+    return isinstance(o, Iterable) and not isinstance(o, str)
 
 
 def objectIsShallowPrimative(o: Any) -> bool:
@@ -50,9 +60,9 @@ def objectIsDeepPrimative(o: Any) -> bool:
     :return: True if o itself is a primative type, False otherwise
     :rtype: bool
     """
-    if isinstance(o, list) or isinstance(o, set):
+    if objectIsObjectIterable(o):
         return all(objectIsDeepPrimative(i) for i in o)
-    elif isinstance(o, dict):
+    elif isinstance(o, Mapping):
         return all(isinstance(k, str) and objectIsDeepPrimative(v) for k, v in o.items())
     else:
         return objectIsShallowPrimative(o)
@@ -121,9 +131,9 @@ def objectIsDeepSerializable(o: Any) -> bool:
     :return: True if o itself is a primative type, False otherwise
     :rtype: bool
     """
-    if isinstance(o, list) or isinstance(o, set):
+    if objectIsObjectIterable(o):
         return all(objectIsDeepSerializable(i) for i in o)
-    elif isinstance(o, dict):
+    elif isinstance(o, Mapping):
         return all(isinstance(k, str) and objectIsDeepSerializable(v) for k, v in o.items())
     else:
         return objectIsShallowSerializable(o)
@@ -138,7 +148,7 @@ def raiseForShallowNonSerializable(o: Any) -> None:
     :raise exceptions.NonSerializableObject: If o is itself a non-serializable type
     :raise exceptions.NonStringMappingKey: If o is a mapping containing a non-str key
     """
-    if isinstance(o, dict):
+    if isinstance(o, Mapping):
         for k in o:
             if not isinstance(k, str):
                 raise exceptions.NonStringMappingKey(k)
@@ -149,10 +159,10 @@ def raiseForShallowNonSerializable(o: Any) -> None:
 def _recurseRaiseForDeepNonSerializable(o: Any, path: List[Union[str, int]]) -> None:
     """Internal recursive method for use exclusively by raiseForDeepNonSerializable.
     """
-    if isinstance(o, list) or isinstance(o, set):
+    if objectIsObjectIterable(o):
         for i in o:
             _recurseRaiseForDeepNonSerializable(i, path + [i])
-    elif isinstance(o, dict):
+    elif isinstance(o, Mapping):
         for k, v in o.items():
             if not isinstance(k, str):
                 raise exceptions.NonStringMappingKey(k, len(path), path)

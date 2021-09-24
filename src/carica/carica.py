@@ -1,7 +1,7 @@
 from types import ModuleType
 import toml
 import os
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Iterable, Mapping
 import tokenize
 from carica.interface import SerializableType, PrimativeType
 from carica.typeChecking import objectIsShallowPrimative
@@ -76,21 +76,21 @@ def _serialize(o: Any, path: List[Union[str, int]], depthLimit=20, serializerKwa
                             serializerKwargs=serializerKwargs)
 
     # o is an iterable, serialize each element
-    if isinstance(o, list) or isinstance(o, set):
+    if isinstance(o, Iterable) and not isinstance(o, str):
         serializedList: List[PrimativeType] = []
         for i in o:
             serializedList.append(_serialize(i, path + [i], depthLimit=depthLimit, serializerKwargs=serializerKwargs))
         
         # ensure serialized lists contain either tables or non-dict primatives, but not both
         if len(serializedList) > 1:
-            if (isinstance(serializedList[0], dict) and any(not isinstance(i, dict) for i in serializedList[1:])) or \
-                    (not isinstance(serializedList[0], dict) and any(isinstance(i, dict) for i in serializedList[1:])):
+            if (isinstance(serializedList[0], Mapping) and any(not isinstance(i, Mapping) for i in serializedList[1:])) or \
+                    (not isinstance(serializedList[0], Mapping) and any(isinstance(i, Mapping) for i in serializedList[1:])):
                 raise exceptions.MultiTypeList(o, len(path)-1, path)
 
         return serializedList
 
     # o is a mapping, serialize each value
-    elif isinstance(o, dict):
+    elif isinstance(o, Mapping):
         serializedDict: Dict[str, PrimativeType] = {}
         for k, v in o.items():
             # ensure keys are str

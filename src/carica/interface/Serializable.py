@@ -1,12 +1,11 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Set, Union, Protocol, runtime_checkable
-from carica import exceptions
+from typing import Iterable, Mapping, Union, Protocol, runtime_checkable
 
 # All types acceptable as toml data
-PrimativeType = Union[int, float, str, bool, List["PrimativeType"], Dict[str, "PrimativeType"], Set["PrimativeType"]] # type: ignore
+PrimativeType = Union[int, float, str, bool, Iterable["PrimativeType"], Mapping[str, "PrimativeType"]] # type: ignore
 # PrimativeType as a shallow set
-primativeTypes = {int, float, str, bool, list, dict, set}
+primativeTypes = {int, float, str, bool, Iterable["PrimativeType"], Mapping[str, "PrimativeType"]}
 
 
 @runtime_checkable
