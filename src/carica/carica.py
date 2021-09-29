@@ -1,16 +1,17 @@
 from types import ModuleType
-import toml
+import tomlkit
 import os
 from typing import Any, Dict, List, Union, Iterable, Mapping
 import tokenize
 from carica.interface import SerializableType, PrimativeType
 from carica.typeChecking import objectIsShallowPrimative
 from carica import exceptions
+from dataclasses import dataclass
 
 CFG_FILE_EXT = ".toml"
 DISALLOWED_TOKEN_TYPES = {tokenize.INDENT}
 DISALLOWED_TOKEN_TYPE_VALUES = {tokenize.NAME: {"from", "import"}}
-LINE_DELIMITER_TOKEN_TYPES = {tokenize.NL, tokenize.NEWLINE}
+LINE_DELIMITER_TOKEN_TYPES = {tokenize.NL, tokenize.NEWLINE, tokenize.ENDMARKER}
 
 
 def tokenDisallowed(token: tokenize.TokenInfo) -> bool:
@@ -25,10 +26,38 @@ def tokenDisallowed(token: tokenize.TokenInfo) -> bool:
         (token.type in DISALLOWED_TOKEN_TYPE_VALUES and token.string in DISALLOWED_TOKEN_TYPE_VALUES[token.type])
 
 
-def _partialModuleVarNames(module: ModuleType) -> List[str]:
-    """Estimate a list of variable names defined in module.
+def lineStartsWithVariableIdentifier(line: List[tokenize.TokenInfo]) -> bool:
+    """Decide if a series of tokens starts with a variable identifier.
+    This is a large estimation.
+    """
+    return line[0].type == tokenize.NAME and any(t.type == tokenize.OP and t.string == "=" for t in line)
+
+
+@dataclass
+class ConfigVariable:
+    name: str
+    value: Any
+    inlineComments: List[str]
+    preComments: List[str]
+
+
+    def hasInline(self):
+        return self.inlineComments != []
+
+
+    def hasPre(self):
+        return self.preComments != []
+
+
+def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
+    """Estimate The set of variables defined in the given module.
     Attempts to ignore other name types, such as functions, classes and imports.
     Names cannot be indented, and multiple assignment is not supported - variable declarations must be on their own lines.
+
+    The resulting dictionary maps variable names to a data class containing the variable name, value, inline comment(s),
+    and preceeding comments. Inline comments can be multiple if the variable was assigned to a second time with a new inline
+    comment. A comment 'preceeds' a variable if it is present either on the line before the variable, or on the line before
+    a preceeding comment of the variable.
 
     This function simply iterates over the module's tokens, and does not build an AST.
     This means that certain name definition structures will result in false positives/negatives.
@@ -42,25 +71,83 @@ def _partialModuleVarNames(module: ModuleType) -> List[str]:
     produces `my_variable` and `key2` as variable names.
 
     :param ModuleType module: The module from which to estimate variable names
-    :return: An estimated list of variable names defined in module. See above for details and limitations.
-    :rtype: List[str]
+    :return: An estimated dict of variables defined in module. See above for details and limitations.
+    :rtype: Dict[str, ConfigVariable]
     """
     with tokenize.open(module.__file__) as f:
         tokens = tokenize.generate_tokens(f.readline)
-        moduleVarNames: List[str] = []
+        # All detected variables
+        moduleVariables: Dict[str, ConfigVariable] = {}
+        # All tokens on the current line
         currentLine: List[tokenize.TokenInfo] = []
+        # Track consecutive lines of comments, in case they preceed a variable
+        commentsQueue: List[str] = []
+        
+        # Iterate over all tokens in the file. tokenizer doesn't split by new line for us, so we'll have to do it manually.
         for token in tokens:
+            # Filter out lines that start with a token that eliminates the possiblity of this line defining a variable
             if currentLine == [] and tokenDisallowed(token):
+                # Clear the preceeding comments queue
+                if commentsQueue:
+                    commentsQueue.clear()
+                # Proceed to the next line of code
                 continue
+            
+            # End of line reached?
             elif token.type in LINE_DELIMITER_TOKEN_TYPES:
+                # Were there any tokens on the line?
                 if currentLine:
-                    if currentLine[0].type == tokenize.NAME and any(t[0] == tokenize.OP and t[1] == "=" for t in currentLine):
-                        moduleVarNames.append(currentLine[0][1])
+                    # Does this line break a series of comments?
+                    if currentLine[0].type != tokenize.COMMENT:
+                        # Was the first token on the line a variable identifier? *This is the estimation bit*
+                        if lineStartsWithVariableIdentifier(currentLine):
+                            # Store a record of the variable
+                            variableName = currentLine[0].string
+                            if variableName not in moduleVariables:
+                                variableValue = getattr(module, variableName)
+                                moduleVariables[variableName] = ConfigVariable(variableName, variableValue, [], [])
+
+                            # Record any preceeding comments
+                            if commentsQueue:
+                                moduleVariables[variableName].preComments += commentsQueue
+
+                        # Clear the preceeding comments queue
+                        if commentsQueue:
+                            commentsQueue.clear()
+
+                    # Move onto the next line
                     currentLine = []
+                
+                # No tokens on the line, breaking any series of comments. Clear the preceeding comments queue
+                elif commentsQueue:
+                    commentsQueue.clear()
+
+            # Is this a comment?
+            elif token.type == tokenize.COMMENT:
+                # Is it an inline comment?
+                if currentLine != []:
+                    # Does this line declare a variable?
+                    if lineStartsWithVariableIdentifier(currentLine):
+                        variableName = currentLine[0].string
+
+                        # Create a record for the variable if none exists
+                        if variableName not in moduleVariables:
+                            variableValue = getattr(module, variableName)
+                            moduleVariables[variableName] = ConfigVariable(variableName, variableValue, [], [])
+
+                        # Record the found inline comment
+                        moduleVariables[variableName].inlineComments.append(token.string.lstrip("# "))
+                
+                # Is it a comment line?
+                else:
+                    # Add the comment text to the preceeding comments queue
+                    commentsQueue.append(token.string)
+
+            # No processing of this token to be performed, record it and move onto the next one in the line
             else:
                 currentLine.append(token)
         
-    return moduleVarNames
+    return moduleVariables
 
 
 def _serialize(o: Any, path: List[Union[str, int]], depthLimit=20, serializerKwargs={}) -> PrimativeType:
@@ -145,7 +232,7 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
     cfgPath += CFG_FILE_EXT
 
     # Read default config values
-    defaults = {k: getattr(cfgModule, k) for k in _partialModuleVarNames(cfgModule) if k in cfgModule.__dict__}
+    defaults = {k: getattr(cfgModule, k) for k in _partialModuleVariables(cfgModule) if k in cfgModule.__dict__}
     
     # Serialize serializable objects and reject non-serializable/non-primative variables
     for varName, varValue in defaults.items():
@@ -153,7 +240,7 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
 
     # Dump to toml and write to file
     with open(cfgPath, "w", encoding="utf-8") as f:
-        f.write(toml.dumps(defaults))
+        f.write(tomlkit.dumps(defaults).lstrip("\n"))
 
     # Print and return path to new file
     print("Created " + cfgPath)
@@ -180,7 +267,7 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, raiseOnUnknownVar: bool = True)
         config = toml.loads(f.read())
 
     # Read default config values
-    defaults = {k: getattr(cfgModule, k) for k in _partialModuleVarNames(cfgModule) if k in cfgModule.__dict__}
+    defaults = {k: getattr(cfgModule, k) for k in _partialModuleVariables(cfgModule) if k in cfgModule.__dict__}
 
     # Assign config values to cfg attributes
     for varname in config:
