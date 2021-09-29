@@ -163,9 +163,13 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
 # TODO: This code has been copied in pretty much 1-1 from bountybot, refactor it and test it
 def loadCfg(cfgModule: ModuleType, cfgFile: str, raiseOnUnknownVar: bool = True):
     """Load the values from a specified config file into attributes of the python cfg module.
-    All config attributes are optional.
+    All config attributes are optional, but if a mapping is given, all desired values must be set.
 
-    :param str cfgFile: Path to the file to load. Can be relative or absolute.
+    :param ModuleType cfgModule: Module to load variable values into
+    :param str cfgFile: Path to the file to load. Can be relative or absolute
+    :param bool raiseOnUnknownVar: Whether to raise an exception or simply print a warning when attempting to load a variable
+                                    from cfgFile which is not named in cfgModule (Default True)
+    :raise ValueError: When cfgFile is of an unsupported format
     """
     # Ensure the given config is toml
     if not cfgFile.endswith(CFG_FILE_EXT):
@@ -189,18 +193,12 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, raiseOnUnknownVar: bool = True)
 
         else:
             # Get default value for variable
-            default = getattr(cfgModule, varname)
+            default = defaults[varname]
             newvalue = config[varname]
+
+            # deserialize serializable variables
             if isinstance(default, SerializableType):
-
-
-
-
-                # TODO: this threw an error before saying deserialize got no arguments, so i passed in the class as well 
-                newvalue = type(default).deserialize(type(default), newvalue)
-
-
-
+                newvalue = type(default).deserialize(newvalue)
 
             # Ensure new value is of the correct type
             if type(config[varname]) != type(default):
