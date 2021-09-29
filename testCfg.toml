@@ -1,3 +1,4 @@
+validListVar = [ 2, [ [ "primitiveValue", "dictValue",], [ "primitiveValue", "dictValue",],],]
 
 [validSerializableVar]
 myField = "i changed it"
