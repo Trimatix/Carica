@@ -1,7 +1,9 @@
 from types import ModuleType
 import tomlkit
+from tomlkit.container import Container as TomlKitContainer
+from tomlkit.items import Item as TomlKitItem
 import os
-from typing import Any, Dict, List, Union, Iterable, Mapping
+from typing import Any, Dict, List, Union, Iterable, Mapping, cast
 import tokenize
 from carica.interface import SerializableType, PrimativeType
 from carica.typeChecking import objectIsShallowPrimative
@@ -211,7 +213,8 @@ def _serialize(o: Any, path: List[Union[str, int]], depthLimit=20, serializerKwa
     raise exceptions.NonSerializableObject(o, len(path)-1, path)
 
 
-def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FILE_EXT, **serializerKwargs) -> str:
+def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FILE_EXT, retainComments: bool = False,
+                    **serializerKwargs) -> str:
     """Create a config file containing all configurable variables with their default values.
     The name of the generated file may optionally be specified.
 
@@ -220,8 +223,19 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
 
     If fileName already exists, then the generated file will be renamed with an incrementing number extension.
 
+    This method has the option to retain variable 'docstrings' - comments which Carica deems to belong to a variable.
+    A comment may belong to a variable if it is one of:
+        a) On the same line as the variable declaration (an 'inline comment')
+        b) A line comment on the line immediately preceeding the variable declaration (a 'preceeding comment')
+        c) A line comment on the line immediately preceeding an existing preceeding comment, allowing for multi-line comments
+
+    This behaviour is disabled by default currently. This is due to the TOML spec's standards for variable ordering
+    within a document being stricter than python's, leading to list and dict preceeding comments appearing in odd places.
+    This is currently in the process of being worked around.
+
     :param ModuleType cfgModule: Module to convert to toml
     :param str fileName: Path to the file to generate (Default "defaultCfg.toml")
+    :param bool retainComments: Whether or not to write variable docstrings to the config (Default False)
     :return: path to the generated config file
     :rtype: str
     :raise ValueError: If fileName does not end in CFG_FILE_EXT
@@ -248,15 +262,35 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
     cfgPath += CFG_FILE_EXT
 
     # Read default config values
-    defaults = {k: getattr(cfgModule, k) for k in _partialModuleVariables(cfgModule) if k in cfgModule.__dict__}
-    
-    # Serialize serializable objects and reject non-serializable/non-primative variables
-    for varName, varValue in defaults.items():
-        defaults[varName] = _serialize(varValue, [varName], serializerKwargs=serializerKwargs)
+    defaults = _partialModuleVariables(cfgModule)
+
+    # Make a document to populate
+    newDoc = tomlkit.document()
+
+    # Iterate over all variables in the module
+    for varName, var in defaults.items():
+        # Does the variable have any preceeding comments?
+        if retainComments and var.hasPre():
+            # Add a new line, just for readability
+            newDoc.add(tomlkit.nl())
+            # Add all preceeding comments
+            for prevDoc in var.preComments:
+                newDoc.add(tomlkit.comment(prevDoc))
+
+        # Serialize the variable if required, and write it to the doc
+        newDoc[varName] = _serialize(var.value, [varName], serializerKwargs=serializerKwargs)
+
+        # Does the variable have any preceeding comments?
+        if retainComments and var.hasInline():
+            # Add all inline comments
+            for inDoc in var.preComments:
+                if type(newDoc[varName]) == TomlKitContainer:
+                    raise RuntimeError(f"Attempted to add a comment to a tomlkit.container.Container: {varName}")
+                cast(TomlKitItem, newDoc[varName]).comment(inDoc)
 
     # Dump to toml and write to file
     with open(cfgPath, "w", encoding="utf-8") as f:
-        f.write(tomlkit.dumps(defaults).lstrip("\n"))
+        f.write(tomlkit.dumps(newDoc).lstrip("\n"))
 
     # Print and return path to new file
     print("Created " + cfgPath)
