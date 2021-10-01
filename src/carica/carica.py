@@ -82,11 +82,23 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
         currentLine: List[tokenize.TokenInfo] = []
         # Track consecutive lines of comments, in case they preceed a variable
         commentsQueue: List[str] = []
+
+        ignoreLine = False
         
         # Iterate over all tokens in the file. tokenizer doesn't split by new line for us, so we'll have to do it manually.
         for token in tokens:
+            # If the current line is to be ignored
+            if ignoreLine:
+                # Continue iterating until a new line character is found, then stop and go back to normal parsing
+                if token.type == tokenize.NEWLINE:
+                    ignoreLine = False
+                continue
+
             # Filter out lines that start with a token that eliminates the possiblity of this line defining a variable
             if currentLine == [] and tokenDisallowed(token):
+                # Set line ignore flag
+                if token.type != tokenize.NEWLINE:
+                    ignoreLine = True
                 # Clear the preceeding comments queue
                 if commentsQueue:
                     commentsQueue.clear()
@@ -97,7 +109,10 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
             elif token.type in LINE_DELIMITER_TOKEN_TYPES:
                 # Were there any tokens on the line?
                 if currentLine:
-                    # Does this line break a series of comments?
+                    # This check needs to be performed before clearing the preceeding comments queue,
+                    # As it checks if the new line breaks a series of comments. I might as well put the
+                    # variable registering logic in here as well, because it also can only happen if the
+                    # line did not start with a comment, and it also calls for clearing the preeding comments queue.
                     if currentLine[0].type != tokenize.COMMENT:
                         # Was the first token on the line a variable identifier? *This is the estimation bit*
                         if lineStartsWithVariableIdentifier(currentLine):
@@ -141,7 +156,8 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
                 # Is it a comment line?
                 else:
                     # Add the comment text to the preceeding comments queue
-                    commentsQueue.append(token.string)
+                    commentsQueue.append(token.string.lstrip("# "))
+                    currentLine.append(token)
 
             # No processing of this token to be performed, record it and move onto the next one in the line
             else:
