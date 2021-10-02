@@ -204,10 +204,10 @@ def test_partialModuleVariables_Comments_Inline_TrueNegative(testModulePath, exp
 
 @pytest.mark.parametrize(("testModulePath", "outputPath", "giveOutputPath"),
                             [
-                                ("testModules.makeDefaultCfg.emptyConfig", "defaultCfg.toml", False),
-                                ("testModules.makeDefaultCfg.emptyConfig", "defaultCfg.toml", True),
-                                ("testModules.makeDefaultCfg.emptyConfig", "myCfg.toml", True),
-                                ("testModules.makeDefaultCfg.emptyConfig", f"{TESTS_TEMP_DIR}/myCfg.toml", True)
+                                ("testModules.emptyConfig", "defaultCfg.toml", False),
+                                ("testModules.emptyConfig", "defaultCfg.toml", True),
+                                ("testModules.emptyConfig", "myCfg.toml", True),
+                                ("testModules.emptyConfig", f"{TESTS_TEMP_DIR}/myCfg.toml", True)
                             ])
 def test_makeDefaultCfg_makesFile(testModulePath, outputPath, giveOutputPath):
     setupTempDir()
@@ -256,4 +256,24 @@ def test_makeDefaultCfg_hasCorrectContents(testModulePath, expectedOutputPath):
 
     assert expectedConfigContent == generatedConfigContent
 
+    cleanupTempDir()
+
+
+@pytest.mark.parametrize(("testModulePath", "expectedException"),
+                            [
+                                ("testModules.makeDefaultCfg.rejectsInvalid.nonSerializable",
+                                    carica.exceptions.NonSerializableObject),
+                                ("testModules.makeDefaultCfg.rejectsInvalid.nonStringMappingKey",
+                                    carica.exceptions.NonStringMappingKey),
+                                ("testModules.makeDefaultCfg.rejectsInvalid.multiTypeList",
+                                    carica.exceptions.MultiTypeList)
+                            ])
+def test_makeDefaultCfg_rejectsInvalid(testModulePath, expectedException):
+    setupTempDir()
+    testModule = importlib.import_module(testModulePath)
+    outputPath = f"{TESTS_TEMP_DIR}/test_makeDefaultCfg_rejectsInvalid.toml"
+
+    with pytest.raises(expectedException):
+        carica.makeDefaultCfg(testModule, fileName=outputPath)
+    
     cleanupTempDir()
