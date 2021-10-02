@@ -144,3 +144,44 @@ def test_partialModuleVariables_Comments_Preceeding_TrueNegative(testModulePath,
         assert extractedName in expectedComments
         if extractedName in expectedComments:
             assert extractedVar.preComments == expectedComments[extractedName]
+
+
+@pytest.mark.parametrize(("testModulePath", "expectedComments"),
+                            [
+                                (
+                                    "testModules.partialModuleVariables_Comments_Inline_TruePositive.singleComment",
+                                    {"intVar": ["my intvar comment"], "stringVar": ["my stringvar comment"],
+                                    "float_var": ["an inline comment"]}
+                                )
+                            ])
+def test_partialModuleVariables_Comments_Inline_TruePositive(testModulePath, expectedComments):
+    testModule = importlib.import_module(testModulePath)
+
+    extractedVars = carica.carica._partialModuleVariables(testModule)
+
+    for extractedName, extractedVar in extractedVars.items():
+        assert extractedName in expectedComments
+        assert extractedVar.inlineComments == expectedComments[extractedName]
+
+
+@pytest.mark.parametrize(("testModulePath", "expectedComments"),
+                            [
+                                (
+                                    "testModules.partialModuleVariables_Comments_Inline_TrueNegative.singleComment",
+                                    {"intVar": [], "stringVar": [], "float_var": []}
+                                ),
+                                
+                                (
+                                    "testModules.partialModuleVariables_Comments_Inline_TrueNegative.noComment",
+                                    {"list_var": [], "dict_var": [], "setVar": []}
+                                )
+                            ])
+def test_partialModuleVariables_Comments_Inline_TrueNegative(testModulePath, expectedComments):
+    testModule = importlib.import_module(testModulePath)
+
+    extractedVars = carica.carica._partialModuleVariables(testModule)
+
+    for extractedName, extractedVar in extractedVars.items():
+        assert extractedName in expectedComments
+        if extractedName in expectedComments:
+            assert extractedVar.preComments == expectedComments[extractedName]
