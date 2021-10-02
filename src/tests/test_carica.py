@@ -2,6 +2,21 @@ import pytest
 import carica
 from caricaTestUtils import tokenizeLine
 import importlib
+import os
+import shutil
+
+
+TESTS_TEMP_DIR = "testsTemp"
+
+
+def cleanupTempDir():
+    if os.path.isdir(TESTS_TEMP_DIR):
+        shutil.rmtree(TESTS_TEMP_DIR)
+
+
+def setupTempDir():
+    cleanupTempDir()
+    os.makedirs(TESTS_TEMP_DIR)
 
 
 @pytest.mark.parametrize("testCase",
@@ -185,3 +200,60 @@ def test_partialModuleVariables_Comments_Inline_TrueNegative(testModulePath, exp
         assert extractedName in expectedComments
         if extractedName in expectedComments:
             assert extractedVar.inlineComments == expectedComments[extractedName]
+
+
+@pytest.mark.parametrize(("testModulePath", "outputPath", "giveOutputPath"),
+                            [
+                                ("testModules.makeDefaultCfg.emptyConfig", "defaultCfg.toml", False),
+                                ("testModules.makeDefaultCfg.emptyConfig", "defaultCfg.toml", True),
+                                ("testModules.makeDefaultCfg.emptyConfig", "myCfg.toml", True),
+                                ("testModules.makeDefaultCfg.emptyConfig", f"{TESTS_TEMP_DIR}/myCfg.toml", True)
+                            ])
+def test_makeDefaultCfg_makesFile(testModulePath, outputPath, giveOutputPath):
+    setupTempDir()
+    testModule = importlib.import_module(testModulePath)
+
+    assert not os.path.isfile(outputPath)
+    if giveOutputPath:
+        carica.makeDefaultCfg(testModule, fileName=outputPath)
+    else:
+        carica.makeDefaultCfg(testModule)
+
+    assert os.path.isfile(outputPath)
+    os.remove(outputPath)
+
+
+# Preceeding comment tests disabled for now because this functionality is incomplete
+@pytest.mark.parametrize(("testModulePath", "expectedOutputPath"),
+                            [
+                                ("testModules.makeDefaultCfg.hasCorrectContents.primativeTypes",
+                                    "src/tests/testConfigs/makeDefaultCfg/hasCorrectContents/primativeTypes.toml"),
+                                ("testModules.makeDefaultCfg.hasCorrectContents.primativeTypes_Comments_Inline",
+                                    "src/tests/testConfigs/makeDefaultCfg/hasCorrectContents/primativeTypes_Comments_Inline.toml"),
+                                # ("testModules.makeDefaultCfg.hasCorrectContents.primativeTypes_Comments_Preceeding",
+                                #     "src/tests/testConfigs/makeDefaultCfg/hasCorrectContents/primativeTypes_Comments_Preceeding.toml"),
+
+                                ("testModules.makeDefaultCfg.hasCorrectContents.serializableTypes",
+                                    "src/tests/testConfigs/makeDefaultCfg/hasCorrectContents/serializableTypes.toml"),
+                                ("testModules.makeDefaultCfg.hasCorrectContents.serializableTypes_Comments_Inline",
+                                    "src/tests/testConfigs/makeDefaultCfg/hasCorrectContents/serializableTypes_Comments_Inline.toml"),
+                                # ("testModules.makeDefaultCfg.hasCorrectContents.serializableTypes_Comments_Preceeding",
+                                #     "src/tests/testConfigs/makeDefaultCfg/hasCorrectContents/serializableTypes_Comments_Preceeding.toml")
+                            ])
+def test_makeDefaultCfg_hasCorrectContents(testModulePath, expectedOutputPath):
+    setupTempDir()
+    testModule = importlib.import_module(testModulePath)
+    outputPath = f"{TESTS_TEMP_DIR}/test_makeDefaultCfg_hasCorrectContents.toml"
+
+    with open(expectedOutputPath, "r") as f:
+        expectedConfigContent = f.read()
+
+    assert not os.path.isfile(outputPath)
+    carica.makeDefaultCfg(testModule, fileName=outputPath)
+    
+    with open(outputPath, "r") as f:
+        generatedConfigContent = f.read()
+
+    assert expectedConfigContent == generatedConfigContent
+
+    cleanupTempDir()

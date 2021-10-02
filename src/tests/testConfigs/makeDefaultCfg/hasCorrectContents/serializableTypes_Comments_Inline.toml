@@ -1,0 +1,2 @@
+[myCustomType] # this is an inline comment on myCustomType
+myField = "hello"
