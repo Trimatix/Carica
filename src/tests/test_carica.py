@@ -1,9 +1,11 @@
 import pytest
 import carica
+from carica.carica import BadTypeBehaviour, BadTypeHandling, ErrorHandling
 from caricaTestUtils import tokenizeLine
 import importlib
 import os
 import shutil
+import tomlkit
 
 
 TESTS_TEMP_DIR = "testsTemp"
@@ -277,3 +279,114 @@ def test_makeDefaultCfg_rejectsInvalid(testModulePath, expectedException):
         carica.makeDefaultCfg(testModule, fileName=outputPath)
     
     cleanupTempDir()
+
+
+@pytest.mark.parametrize(("testModulePath", "testConfigPath"),
+                            [
+                                ("testModules.loadCfg.loadsCorrectValues.primativeTypes",
+                                    "src/tests/testConfigs/loadCfg/loadsCorrectValues/primativeTypes.toml"),
+                                ("testModules.loadCfg.loadsCorrectValues.serializableTypes",
+                                    "src/tests/testConfigs/loadCfg/loadsCorrectValues/serializableTypes.toml"),
+                            ])
+def test_loadCfg_loadsCorrectValues(testModulePath, testConfigPath):
+    testModule = importlib.import_module(testModulePath)
+    with open(testConfigPath, "r") as f:
+        testConfigValues = tomlkit.loads(f.read())
+
+    # Make sure the test config actually changes something
+    assert not all(getattr(testModule, varName) == testConfigValues[varName] for varName in testConfigValues)
+
+    carica.loadCfg(testModule, testConfigPath)
+
+    # Make sure the config values were loaded in
+    for varName in testConfigValues:
+        assert carica.carica._serialize(getattr(testModule, varName), [varName]) == testConfigValues[varName]
+
+
+@pytest.mark.parametrize(("testModulePath", "testConfigPath", "expectedException"),
+                            [
+                                ("testModules.loadCfg.rejectsInvalid.incorrectTypes_primativeTypes",
+                                    "src/tests/testConfigs/loadCfg/rejectsInvalid/incorrectTypes_primativeTypes.toml",
+                                    TypeError),
+                                ("testModules.loadCfg.rejectsInvalid.incorrectTypes_serializableTypes",
+                                    "src/tests/testConfigs/loadCfg/rejectsInvalid/incorrectTypes_serializableTypes.toml",
+                                    TypeError),
+                                ("testModules.loadCfg.rejectsInvalid.serializableTypes_serializeFail",
+                                    "src/tests/testConfigs/loadCfg/rejectsInvalid/serializableTypes_serializeFail.toml",
+                                    KeyError)
+                            ])
+def test_loadCfg_rejectsInvalid(testModulePath, testConfigPath, expectedException):
+    testModule = importlib.import_module(testModulePath)
+
+    with pytest.raises(expectedException):
+        carica.loadCfg(testModule, testConfigPath)
+
+
+@pytest.mark.parametrize(("testModulePath", "testConfigPath"),
+                            [
+                                ("testModules.loadCfg_typeCasting.loadsCorrectValues.primativeTypes",
+                                    "src/tests/testConfigs/loadCfg_typeCasting/loadsCorrectValues/primativeTypes.toml")
+                            ])
+def test_loadCfg_typeCasting_loadsCorrectValues(testModulePath, testConfigPath):
+    testModule = importlib.import_module(testModulePath)
+    with open(testConfigPath, "r") as f:
+        testConfigValues = tomlkit.loads(f.read())
+
+    defaults = carica.carica._partialModuleVariables(testModule)
+
+    # Make sure the test config actually has a variable of an incorrect type
+    assert not all(type(getattr(testModule, varName)) == type(testConfigValues[varName]) for varName in testConfigValues)
+
+    carica.loadCfg(testModule, testConfigPath)
+
+    # Make sure the config values have not changed
+    for varName in testConfigValues:
+        assert carica.carica._serialize(getattr(testModule, varName), [varName]) == defaults[varName].value
+
+
+@pytest.mark.parametrize(("testModulePath", "testConfigPath", "expectedException"),
+                            [
+                                ("testModules.loadCfg_typeCasting.rejectsInvalid.primativeTypes",
+                                    "src/tests/testConfigs/loadCfg_typeCasting/rejectsInvalid/primativeTypes.toml",
+                                    TypeError)
+                            ])
+def test_loadCfg_typeCasting_rejectsInvalid(testModulePath, testConfigPath, expectedException):
+    testModule = importlib.import_module(testModulePath)
+    with open(testConfigPath, "r") as f:
+        testConfigValues = tomlkit.loads(f.read())
+
+    # Make sure the test config actually has a variable of an incorrect type
+    assert not all(type(getattr(testModule, varName)) == type(testConfigValues[varName]) for varName in testConfigValues)
+
+    with pytest.raises(expectedException):
+        carica.loadCfg(testModule, testConfigPath)
+
+
+@pytest.mark.parametrize(("testModulePath", "testConfigPath"),
+                            [
+                                ("testModules.loadCfg_typeCasting.allowsCastFailKeeping.primativeTypes",
+                                    "src/tests/testConfigs/loadCfg_typeCasting/allowsCastFailKeeping/primativeTypes.toml")
+                            ])
+def test_loadCfg_typeCasting_allowsCastFailKeeping(testModulePath, testConfigPath):
+    testModule = importlib.import_module(testModulePath)
+    with open(testConfigPath, "r") as f:
+        testConfigValues = tomlkit.loads(f.read())
+
+    defaults = carica.carica._partialModuleVariables(testModule)
+
+    # Make sure the test config actually has a variable of an incorrect type
+    assert not all(type(getattr(testModule, varName)) == type(testConfigValues[varName]) for varName in testConfigValues)
+
+    badTypeHandling = BadTypeHandling()
+    badTypeHandling.behaviour = BadTypeBehaviour.CAST
+    badTypeHandling.rejectType = ErrorHandling.RAISE
+    badTypeHandling.keepFailedCast = True
+    badTypeHandling.logTypeKeeping = False
+    badTypeHandling.logSuccessfulCast = False
+    badTypeHandling.includeExceptionTrace = True
+
+    carica.loadCfg(testModule, testConfigPath, badTypeHandling)
+
+    # Make sure the config values have not changed
+    for varName in defaults:
+        assert carica.carica._serialize(getattr(testModule, varName), [varName]) == testConfigValues[varName].value
