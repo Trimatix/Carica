@@ -246,7 +246,7 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
         b) A line comment on the line immediately preceeding the variable declaration (a 'preceeding comment')
         c) A line comment on the line immediately preceeding an existing preceeding comment, allowing for multi-line comments
 
-    This behaviour is disabled by default currently. This is due to the TOML spec's standards for variable ordering
+    Retaining of preceeding comments is currently disabled. This is due to the TOML spec's standards for variable ordering
     within a document being stricter than python's, leading to list and dict preceeding comments appearing in odd places.
     This is currently in the process of being worked around.
 
@@ -285,6 +285,8 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
 
     # Iterate over all variables in the module
     for varName, var in defaults.items():
+        # Preceeding comments are currently disabled, while variable reordering is worked around
+        """
         # Does the variable have any preceeding comments?
         if retainComments and var.hasPre():
             # Add a new line, just for readability
@@ -292,6 +294,7 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
             # Add all preceeding comments
             for prevDoc in var.preComments:
                 newDoc.add(tomlkit.comment(prevDoc))
+        """
 
         # Serialize the variable if required, and write it to the doc
         newDoc[varName] = _serialize(var.value, [varName], serializerKwargs=serializerKwargs)
