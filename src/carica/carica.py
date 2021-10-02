@@ -425,7 +425,7 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
             newValue: Any
             # This check ignores any config attributes that do not have a value, for example comments and whitespace.
             if isinstance(config[varName], _TKItemWithValue):
-                newValue = cast(_TKItemWithValue, config[varName]).value()
+                newValue = cast(_TKItemWithValue, config[varName]).value
 
             # deserialize serializable variables
             if isinstance(default, SerializableType):
@@ -433,7 +433,7 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
 
             # Handle variables of different types to that which is defined in the python module
             if type(config[varName]) != type(default):
-                
+
                 # Handle type rejections
                 if badTypeHandling.behaviour == BadTypeBehaviour.REJECT:
                     errMsg = f"Unexpected type for config variable {varName}: Expected " \
