@@ -184,4 +184,4 @@ def test_partialModuleVariables_Comments_Inline_TrueNegative(testModulePath, exp
     for extractedName, extractedVar in extractedVars.items():
         assert extractedName in expectedComments
         if extractedName in expectedComments:
-            assert extractedVar.preComments == expectedComments[extractedName]
+            assert extractedVar.inlineComments == expectedComments[extractedName]
