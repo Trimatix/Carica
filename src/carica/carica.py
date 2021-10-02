@@ -10,6 +10,7 @@ from carica.interface import SerializableType, PrimativeType
 from carica.typeChecking import objectIsShallowPrimative
 from carica import exceptions
 from dataclasses import dataclass
+import traceback
 
 CFG_FILE_EXT = ".toml"
 DISALLOWED_TOKEN_TYPES = {tokenize.INDENT}
@@ -19,6 +20,12 @@ LINE_DELIMITER_TOKEN_TYPES = {tokenize.NL, tokenize.NEWLINE, tokenize.ENDMARKER}
 
 def log(msg):
     print(msg)
+
+
+def formatException(e, includeTrace):
+    if includeTrace:
+        return "".join(traceback.format_exception(type(e), e, e.__traceback__))
+    return str(e)
 
 
 def tokenDisallowed(token: tokenize.TokenInfo) -> bool:
@@ -366,6 +373,8 @@ class BadTypeHandling:
     The `logSuccessfulCast` field sets whether to create a log message in the event of a type-mismatched variable being casted
     to the correct type successfuly. This field is only of use where `behaviour` is `CAST`.
 
+    The `includeExceptionTrace` field sets whether exception logging should include the exception trace.
+
     :var behaviour: Enum setting how to handle mismatched variable types. See class for value descriptions (Default CAST)
     :vartype behaviour: BadTypeBehaviour
     :var rejectType: Enum setting the handling for the above type rejections. See class for value descriptions (Default RAISE)
@@ -376,12 +385,15 @@ class BadTypeHandling:
     :vartype logTypeKeeping: bool
     :var logSuccessfulCast: Whether to log successful casts of mismatched variable types (Default True)
     :vartype logSuccessfulCast: bool
+    :var includeExceptionTrace: Whether to include the trace of logged exceptions, e.g in `keepFailedCast` (Default False)
+    :vartype includeExceptionTrace: bool
     """
     behaviour = BadTypeBehaviour.CAST
     rejectType = ErrorHandling.RAISE
     keepFailedCast = False
     logTypeKeeping = True
     logSuccessfulCast = True
+    includeExceptionTrace = False
 
 
 def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandling = BadTypeHandling(),
@@ -456,12 +468,12 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
                             if badTypeHandling.logTypeKeeping:
                                 log(f"[WARNING] Keeping original value for mistype variable {varName}, following failed " \
                                     + f"cast. Expected {type(default).__name__}, received {type(newValue).__name__}," \
-                                    + f" cast exception: {e}")
+                                    + f" cast exception: {formatException(e, badTypeHandling.includeExceptionTrace)}")
                         # If configured to reject failed casts
                         else:
                             errMsg = f"Casting failed for unexpected type for config variable {varName}: Expected " \
                                     + f"{type(default).__name__}, received {type(newValue).__name__}. " \
-                                    + f"Cast exception: {e}"
+                                    + f"Cast exception: {formatException(e, badTypeHandling.includeExceptionTrace)}"
                             if badTypeHandling.rejectType == ErrorHandling.RAISE:
                                 raise TypeError(errMsg)
                             elif badTypeHandling.rejectType == ErrorHandling.LOG:
