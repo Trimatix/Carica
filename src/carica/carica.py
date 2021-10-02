@@ -426,18 +426,20 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
             # This check ignores any config attributes that do not have a value, for example comments and whitespace.
             if isinstance(config[varName], _TKItemWithValue):
                 newValue = cast(_TKItemWithValue, config[varName]).value
+            else:
+                continue
 
             # deserialize serializable variables
             if isinstance(default, SerializableType):
                 newValue = type(default).deserialize(newValue)
 
             # Handle variables of different types to that which is defined in the python module
-            if type(config[varName]) != type(default):
+            if type(newValue) != type(default):
 
                 # Handle type rejections
                 if badTypeHandling.behaviour == BadTypeBehaviour.REJECT:
                     errMsg = f"Unexpected type for config variable {varName}: Expected " \
-                            + f"{type(default).__name__}, received {type(config[varName]).__name__}"
+                            + f"{type(default).__name__}, received {type(newValue).__name__}"
                     if badTypeHandling.rejectType == ErrorHandling.RAISE:
                         raise TypeError(errMsg)
                     elif badTypeHandling.behaviour == ErrorHandling.LOG:
@@ -447,18 +449,18 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
                 elif badTypeHandling.behaviour == BadTypeBehaviour.CAST:
                     try:
                         # Attempt casts for incorrect types - useful for things like ints instead of floats.
-                        config[varName] = type(default)(config[varName])
+                        newValue = type(default)(newValue)
                     except Exception as e:
                         if badTypeHandling.keepFailedCast:
                             # Nothing to do if keeping failed variable casts, except log if configured to
                             if badTypeHandling.logTypeKeeping:
                                 log(f"[WARNING] Keeping original value for mistype variable {varName}, following failed " \
-                                    + f"cast. Expected {type(default).__name__}, received {type(config[varName]).__name__}," \
+                                    + f"cast. Expected {type(default).__name__}, received {type(newValue).__name__}," \
                                     + f" cast exception: {e}")
                         # If configured to reject failed casts
                         else:
                             errMsg = f"Casting failed for unexpected type for config variable {varName}: Expected " \
-                                    + f"{type(default).__name__}, received {type(config[varName]).__name__}. " \
+                                    + f"{type(default).__name__}, received {type(newValue).__name__}. " \
                                     + f"Cast exception: {e}"
                             if badTypeHandling.rejectType == ErrorHandling.RAISE:
                                 raise TypeError(errMsg)
@@ -469,17 +471,17 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
                     else:
                         if badTypeHandling.logSuccessfulCast:
                             log(f"[WARNING] Successfuly casted unexpected type for config variable {varName} from type " \
-                                + f"{type(config[varName]).__name__} to {type(default).__name__}")
+                                + f"{type(newValue).__name__} to {type(default).__name__}")
 
                 # Handle type keeping
                 elif badTypeHandling.behaviour == BadTypeBehaviour.KEEP:
                     # Nothing to do if keeping mismatched variables, except log if configured to
                     if badTypeHandling.logTypeKeeping:
                         log(f"[WARNING] Keeping original value for mistype variable {varName}. Expected " \
-                            + f"{type(default).__name__}, received {type(config[varName]).__name__}")
+                            + f"{type(default).__name__}, received {type(newValue).__name__}")
 
             # Variable value received successfuly, inject into python module
-            setattr(cfgModule, varName, config[varName])
+            setattr(cfgModule, varName, newValue)
 
     # No errors encountered
     log("Config successfully loaded: " + cfgFile)
