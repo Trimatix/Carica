@@ -1,6 +1,7 @@
 import pytest
 import carica
 from caricaTestUtils import tokenizeLine
+import importlib
 
 
 @pytest.mark.parametrize("testCase",
@@ -27,3 +28,68 @@ def test_lineStartsWithVariableIdentifier_TruePositive(testCase):
                             ])
 def test_lineStartsWithVariableIdentifier_TrueNegative(testCase):
     assert not carica.carica.lineStartsWithVariableIdentifier(tokenizeLine(testCase))
+
+
+@pytest.mark.parametrize(("testModulePath", "expectedNames"),
+                            [
+                                (
+                                    "testModules.partialModuleVariables_TruePositive.basicTypes",
+                                    {"intVar", "stringVar", "float_var"}
+                                ),
+
+                                (
+                                    "testModules.partialModuleVariables_TruePositive.recursiveTypes",
+                                    {"list_var", "dict_var", "setVar"}
+                                ),
+                                
+                                (
+                                    "testModules.partialModuleVariables_TruePositive.customTypes",
+                                    {"myCustomType"}
+                                )
+                            ])
+def test_partialModuleVariables_TruePositive(testModulePath, expectedNames):
+    testModule = importlib.import_module(testModulePath)
+
+    extractedVars = carica.carica._partialModuleVariables(testModule)
+
+    for expectedName in expectedNames:
+        assert expectedName in extractedVars
+        assert extractedVars[expectedName].value == getattr(testModule, expectedName)
+
+    for extractedName in extractedVars:
+        assert extractedName in extractedVars
+
+
+@pytest.mark.parametrize(("testModulePath", "expectedNames"),
+                            [
+                                (
+                                    "testModules.partialModuleVariables_TrueNegative.basicTypes",
+                                    {}
+                                ),
+
+                                (
+                                    "testModules.partialModuleVariables_TrueNegative.recursiveTypes",
+                                    {}
+                                ),
+                                
+                                (
+                                    "testModules.partialModuleVariables_TrueNegative.customTypes",
+                                    {}
+                                ),
+
+                                (
+                                    "testModules.partialModuleVariables_TrueNegative.hintsOnly",
+                                    {}
+                                )
+                            ])
+def test_partialModuleVariables_TrueNegative(testModulePath, expectedNames):
+    testModule = importlib.import_module(testModulePath)
+
+    extractedVars = carica.carica._partialModuleVariables(testModule)
+
+    for expectedName in expectedNames:
+        assert expectedName in extractedVars
+        assert extractedVars[expectedName].value == getattr(testModule, expectedName)
+
+    for extractedName in extractedVars:
+        assert extractedName in extractedVars
