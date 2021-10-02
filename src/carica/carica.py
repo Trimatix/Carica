@@ -233,7 +233,7 @@ def _serialize(o: Any, path: List[Union[str, int]], depthLimit=20, serializerKwa
     raise exceptions.NonSerializableObject(o, len(path)-1, path)
 
 
-def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FILE_EXT, retainComments: bool = False,
+def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FILE_EXT, retainComments: bool = True,
                     **serializerKwargs) -> str:
     """Create a config file containing all configurable variables with their default values.
     The name of the generated file may optionally be specified.
@@ -255,7 +255,7 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
 
     :param ModuleType cfgModule: Module to convert to toml
     :param str fileName: Path to the file to generate (Default "defaultCfg.toml")
-    :param bool retainComments: Whether or not to write variable docstrings to the config (Default False)
+    :param bool retainComments: Whether or not to write variable docstrings to the config (Default True)
     :return: path to the generated config file
     :rtype: str
     :raise ValueError: If fileName does not end in CFG_FILE_EXT
