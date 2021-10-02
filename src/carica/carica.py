@@ -1,9 +1,10 @@
+from enum import Enum
 from types import ModuleType
 import tomlkit
-from tomlkit.container import Container as TomlKitContainer
-from tomlkit.items import Item as TomlKitItem
+from tomlkit.container import Container as TKContainer
+from tomlkit import items as TKItems
 import os
-from typing import Any, Dict, List, Union, Iterable, Mapping, cast
+from typing import Any, Dict, List, Protocol, Union, Iterable, Mapping, cast, runtime_checkable
 import tokenize
 from carica.interface import SerializableType, PrimativeType
 from carica.typeChecking import objectIsShallowPrimative
@@ -14,6 +15,10 @@ CFG_FILE_EXT = ".toml"
 DISALLOWED_TOKEN_TYPES = {tokenize.INDENT}
 DISALLOWED_TOKEN_TYPE_VALUES = {tokenize.NAME: {"from", "import"}}
 LINE_DELIMITER_TOKEN_TYPES = {tokenize.NL, tokenize.NEWLINE, tokenize.ENDMARKER}
+
+
+def log(msg):
+    print(msg)
 
 
 def tokenDisallowed(token: tokenize.TokenInfo) -> bool:
@@ -49,6 +54,11 @@ class ConfigVariable:
 
     def hasPre(self):
         return self.preComments != []
+
+
+@runtime_checkable
+class _TKItemWithValue(Protocol):
+    def value(self): ...
 
 
 def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
@@ -242,7 +252,6 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
     """
     # Ensure fileName is toml
     if not fileName.endswith(CFG_FILE_EXT):
-        print(fileName)
         raise ValueError("file name must end with " + CFG_FILE_EXT)
 
     # Create missing directories
@@ -284,28 +293,108 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
         if retainComments and var.hasInline():
             # Add all inline comments
             for inDoc in var.preComments:
-                if type(newDoc[varName]) == TomlKitContainer:
+                if type(newDoc[varName]) == TKContainer:
                     raise RuntimeError(f"Attempted to add a comment to a tomlkit.container.Container: {varName}")
-                cast(TomlKitItem, newDoc[varName]).comment(inDoc)
+                cast(TKItems.Item, newDoc[varName]).comment(inDoc)
 
     # Dump to toml and write to file
     with open(cfgPath, "w", encoding="utf-8") as f:
         f.write(tomlkit.dumps(newDoc).lstrip("\n"))
 
-    # Print and return path to new file
-    print("Created " + cfgPath)
+    # log and return path to new file
+    log("Created " + cfgPath)
     return cfgPath
 
 
-# TODO: This code has been copied in pretty much 1-1 from bountybot, refactor it and test it
-def loadCfg(cfgModule: ModuleType, cfgFile: str, raiseOnUnknownVar: bool = True):
+class BadTypeBehaviour(Enum):
+    """Configure how to handle receiving variable values in toml that are of a different type to the corresponding
+    variable in the python module.
+    
+    Values:
+    - REJECT: Reject the value, falling back on ErrorHandling behaviour
+    - KEEP: Ignore type discrepencies, and just pass the variable into the python module regardless
+    - CAST: Attempt to cast the incorrectly-typed value with a call the correct type.
+            E.g if the variable is of type float in python, but int is received from TOMl, this behaviour will call float(x)
+            Where x is the value given in TOML
+    """
+    REJECT = 1
+    KEEP = 2
+    CAST = 3
+
+
+class ErrorHandling(Enum):
+    """Configure how to handle errors. Refer to the usage context of this class for the specific behaviour that will
+    resut from this setting.
+    
+    Values:
+    - RAISE: Raise an exception
+    - LOG: Log the error without throwing an exception
+    - IGNORE: Do nothing
+    """
+    RAISE = 1
+    LOG = 2
+    IGNORE = 3
+
+
+@dataclass
+class BadTypeHandling:
+    """Configure how Carica should handle receiving variable values in toml that are of a different type to the corresponding
+    variable in the python module, and details of logging for these events.
+
+    The `behaviour` field sets how Carica should handle variable types in TOML that do not match the type expected by the
+    python module. This allows for automatic type casting, which can be especially useful for primative types, for example:
+    If the python module contains a variable that is of type `float`, but the variable is given as an `int` in toml,
+    `BadTypeBehaviour.CAST` will cast the toml-given value to `float` using the `float(x)` constructor.
+
+    The `rejectType` field sets how Carica should handle variable type rejections. If `behaviour` is `REJECT`, should
+    an exception be thrown, or a log created, or neither?
+
+    The `keepFailedCast` field is used where `behaviour` is `CAST`, setting whether to keep or reject values which fail
+    casting. If an exception occurs when attempting to cast (e.g an appropriate constructor does not exist), then
+    `keepFailedCast` triggers the following:
+     - When `True`, keep the value from before the attempted cast, and pass this (wrongly typed) value to the python module
+     - When `False`, reject this value, falling back on `rejectType` behaviour
+
+    The `logTypeKeeping` field sets whether the keeping of variables of mismatched types should be logged. This field is used
+    in two cases:
+        - If `behaviour` is `KEEP`, and a value of a mismatched type is encountered
+        - If `behaviour` is `CAST`, `keepFailedCast` is `True`, and a value fails type casting
+
+    In either of these cases, if `logTypeKeeping` is `True`, a log will be created of the event. Otherwise, the value will be
+    kept silently.
+
+    The `logSuccessfulCast` field sets whether to create a log message in the event of a type-mismatched variable being casted
+    to the correct type successfuly. This field is only of use where `behaviour` is `CAST`.
+
+    :var behaviour: Enum setting how to handle mismatched variable types. See class for value descriptions (Default CAST)
+    :vartype behaviour: BadTypeBehaviour
+    :var rejectType: Enum setting the handling for the above type rejections. See class for value descriptions (Default RAISE)
+    :vartype rejectType: ErrorHandling
+    :var keepFailedCast: Whether to reject values that failed casting, or fall back to keeping the original (Default False)
+    :vartype keepFailedCast: bool
+    :var logTypeKeeping: Whether to log keeping of mismatched variable types or do so silently (Default True)
+    :vartype logTypeKeeping: bool
+    :var logSuccessfulCast: Whether to log successful casts of mismatched variable types (Default True)
+    :vartype logSuccessfulCast: bool
+    """
+    behaviour = BadTypeBehaviour.CAST
+    rejectType = ErrorHandling.RAISE
+    keepFailedCast = False
+    logTypeKeeping = True
+    logSuccessfulCast = True
+
+
+def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandling = BadTypeHandling(),
+            badNameHandling: ErrorHandling = ErrorHandling.RAISE):
     """Load the values from a specified config file into attributes of the python cfg module.
     All config attributes are optional, but if a mapping is given, all desired values must be set.
 
     :param ModuleType cfgModule: Module to load variable values into
     :param str cfgFile: Path to the file to load. Can be relative or absolute
-    :param bool raiseOnUnknownVar: Whether to raise an exception or simply print a warning when attempting to load a variable
-                                    from cfgFile which is not named in cfgModule (Default True)
+    :param ErrorHandling badNameHandling: How to handle variables from cfgFile which are not named in cfgModule. See class
+                                            for default value and value descriptions.
+    :param BadTypeHandling badTypeHandling: How to handle receiving toml variables that do not match the type of the
+                                            python variable. See class for default values and value descriptions.
     :raise ValueError: When cfgFile is of an unsupported format
     """
     # Ensure the given config is toml
@@ -314,42 +403,83 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, raiseOnUnknownVar: bool = True)
 
     # Load from toml to dictionary
     with open(cfgFile, "r", encoding="utf-8") as f:
-        config = toml.loads(f.read())
+        config = tomlkit.loads(f.read())
 
     # Read default config values
-    defaults = {k: getattr(cfgModule, k) for k in _partialModuleVariables(cfgModule) if k in cfgModule.__dict__}
+    defaults = _partialModuleVariables(cfgModule)
 
     # Assign config values to cfg attributes
-    for varname in config:
+    for varName in config:
+        varName = cast(str, varName)
         # Validate attribute names
-        if varname not in defaults:
-            if raiseOnUnknownVar:
-                raise NameError("Unrecognised config variable name: " + varname)
-            else:
-                print("[WARNING] Ignoring unrecognised config variable name: " + varname)
+        if varName not in defaults:
+            if badNameHandling == ErrorHandling.RAISE:
+                raise NameError(f"Unrecognised config variable name: {varName}")
+            elif badNameHandling == ErrorHandling.LOG:
+                log(f"[WARNING] Ignoring unrecognised config variable name: {varName}")
 
         else:
             # Get default value for variable
-            default = defaults[varname]
-            newvalue = config[varname]
+            default = defaults[varName].value
+            # Get the value for the variable that is defined in the config file
+            newValue: Any
+            # This check ignores any config attributes that do not have a value, for example comments and whitespace.
+            if isinstance(config[varName], _TKItemWithValue):
+                newValue = cast(_TKItemWithValue, config[varName]).value()
 
             # deserialize serializable variables
             if isinstance(default, SerializableType):
-                newvalue = type(default).deserialize(newvalue)
+                newValue = type(default).deserialize(newValue)
 
-            # Ensure new value is of the correct type
-            if type(config[varname]) != type(default):
-                try:
-                    # Attempt casts for incorrect types - useful for things like ints instead of floats.
-                    config[varname] = type(default)(config[varname])
-                    print("[WARNING] Casting config variable " + varname + " from " + type(config[varname]).__name__ \
-                            + " to " + type(default).__name__)
-                except Exception:
-                    # Where a variable is of the wrong type and cannot be casted, raise an exception.
-                    raise TypeError("Unexpected type for config variable " + varname + ": Expected " \
-                                    + type(default).__name__ + ", received " + type(config[varname]).__name__)
+            # Handle variables of different types to that which is defined in the python module
+            if type(config[varName]) != type(default):
+                
+                # Handle type rejections
+                if badTypeHandling.behaviour == BadTypeBehaviour.REJECT:
+                    errMsg = f"Unexpected type for config variable {varName}: Expected " \
+                            + f"{type(default).__name__}, received {type(config[varName]).__name__}"
+                    if badTypeHandling.rejectType == ErrorHandling.RAISE:
+                        raise TypeError(errMsg)
+                    elif badTypeHandling.behaviour == ErrorHandling.LOG:
+                        log(f"[WARNING] {errMsg}")
 
-            setattr(cfgModule, varname, config[varname])
+                # Handle type casts
+                elif badTypeHandling.behaviour == BadTypeBehaviour.CAST:
+                    try:
+                        # Attempt casts for incorrect types - useful for things like ints instead of floats.
+                        config[varName] = type(default)(config[varName])
+                    except Exception as e:
+                        if badTypeHandling.keepFailedCast:
+                            # Nothing to do if keeping failed variable casts, except log if configured to
+                            if badTypeHandling.logTypeKeeping:
+                                log(f"[WARNING] Keeping original value for mistype variable {varName}, following failed " \
+                                    + f"cast. Expected {type(default).__name__}, received {type(config[varName]).__name__}," \
+                                    + f" cast exception: {e}")
+                        # If configured to reject failed casts
+                        else:
+                            errMsg = f"Casting failed for unexpected type for config variable {varName}: Expected " \
+                                    + f"{type(default).__name__}, received {type(config[varName]).__name__}. " \
+                                    + f"Cast exception: {e}"
+                            if badTypeHandling.rejectType == ErrorHandling.RAISE:
+                                raise TypeError(errMsg)
+                            elif badTypeHandling.rejectType == ErrorHandling.LOG:
+                                log(f"[WARNING] {errMsg}")
+
+                    # Cast was successful
+                    else:
+                        if badTypeHandling.logSuccessfulCast:
+                            log(f"[WARNING] Successfuly casted unexpected type for config variable {varName} from type " \
+                                + f"{type(config[varName]).__name__} to {type(default).__name__}")
+
+                # Handle type keeping
+                elif badTypeHandling.behaviour == BadTypeBehaviour.KEEP:
+                    # Nothing to do if keeping mismatched variables, except log if configured to
+                    if badTypeHandling.logTypeKeeping:
+                        log(f"[WARNING] Keeping original value for mistype variable {varName}. Expected " \
+                            + f"{type(default).__name__}, received {type(config[varName]).__name__}")
+
+            # Variable value received successfuly, inject into python module
+            setattr(cfgModule, varName, config[varName])
 
     # No errors encountered
-    print("Config successfully loaded: " + cfgFile)
+    log("Config successfully loaded: " + cfgFile)
