@@ -1,0 +1,7 @@
+floatVar = "invalid"
+listVar = 5
+dictVar = 5
+aotVar = 5
+
+[intVar]
+invalidField = "value"

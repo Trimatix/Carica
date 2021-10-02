@@ -1,0 +1,1 @@
+myVar1: int
