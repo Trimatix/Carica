@@ -305,7 +305,7 @@ def makeDefaultCfg(cfgModule: ModuleType, fileName: str = "defaultCfg" + CFG_FIL
         # Does the variable have any preceeding comments?
         if retainComments and var.hasInline():
             # Add all inline comments
-            for inDoc in var.preComments:
+            for inDoc in var.inlineComments:
                 if type(newDoc[varName]) == TKContainer:
                     raise RuntimeError(f"Attempted to add a comment to a tomlkit.container.Container: {varName}")
                 cast(TKItems.Item, newDoc[varName]).comment(inDoc)
