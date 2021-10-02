@@ -44,7 +44,9 @@ def lineStartsWithVariableIdentifier(line: List[tokenize.TokenInfo]) -> bool:
     """Decide if a series of tokens starts with a variable identifier.
     This is a large estimation.
     """
-    return line[0].type == tokenize.NAME and any(t.type == tokenize.OP and t.string == "=" for t in line)
+    return len(line) > 1 \
+        and line[0].type == tokenize.NAME \
+        and line[1].type == tokenize.OP and line[1].string == "="
 
 
 @dataclass
