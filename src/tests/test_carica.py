@@ -33,17 +33,17 @@ def test_lineStartsWithVariableIdentifier_TrueNegative(testCase):
 @pytest.mark.parametrize(("testModulePath", "expectedNames"),
                             [
                                 (
-                                    "testModules.partialModuleVariables_TruePositive.basicTypes",
+                                    "testModules.partialModuleVariables.TruePositive.basicTypes",
                                     {"intVar", "stringVar", "float_var"}
                                 ),
 
                                 (
-                                    "testModules.partialModuleVariables_TruePositive.recursiveTypes",
+                                    "testModules.partialModuleVariables.TruePositive.recursiveTypes",
                                     {"list_var", "dict_var", "setVar"}
                                 ),
                                 
                                 (
-                                    "testModules.partialModuleVariables_TruePositive.customTypes",
+                                    "testModules.partialModuleVariables.TruePositive.customTypes",
                                     {"myCustomType"}
                                 )
                             ])
@@ -63,22 +63,22 @@ def test_partialModuleVariables_TruePositive(testModulePath, expectedNames):
 @pytest.mark.parametrize(("testModulePath", "expectedNames"),
                             [
                                 (
-                                    "testModules.partialModuleVariables_TrueNegative.basicTypes",
+                                    "testModules.partialModuleVariables.TrueNegative.basicTypes",
                                     {}
                                 ),
 
                                 (
-                                    "testModules.partialModuleVariables_TrueNegative.recursiveTypes",
+                                    "testModules.partialModuleVariables.TrueNegative.recursiveTypes",
                                     {}
                                 ),
                                 
                                 (
-                                    "testModules.partialModuleVariables_TrueNegative.customTypes",
+                                    "testModules.partialModuleVariables.TrueNegative.customTypes",
                                     {}
                                 ),
 
                                 (
-                                    "testModules.partialModuleVariables_TrueNegative.hintsOnly",
+                                    "testModules.partialModuleVariables.TrueNegative.hintsOnly",
                                     {}
                                 )
                             ])
@@ -98,12 +98,12 @@ def test_partialModuleVariables_TrueNegative(testModulePath, expectedNames):
 @pytest.mark.parametrize(("testModulePath", "expectedComments"),
                             [
                                 (
-                                    "testModules.partialModuleVariables_Comments_Preceeding_TruePositive.singleComment",
+                                    "testModules.partialModuleVariables.Comments_Preceeding_TruePositive.singleComment",
                                     {"intVar": ["my intVar comment"], "float_var": ["my floatVar comment"]}
                                 ),
 
                                 (
-                                    "testModules.partialModuleVariables_Comments_Preceeding_TruePositive.multiComment",
+                                    "testModules.partialModuleVariables.Comments_Preceeding_TruePositive.multiComment",
                                     {"myCustomType": ["my myCustomType comment", "but it has multiple lines",
                                                         "even has a third one"]}
                                 )
@@ -121,17 +121,17 @@ def test_partialModuleVariables_Comments_Preceeding_TruePositive(testModulePath,
 @pytest.mark.parametrize(("testModulePath", "expectedComments"),
                             [
                                 (
-                                    "testModules.partialModuleVariables_Comments_Preceeding_TrueNegative.singleComment",
+                                    "testModules.partialModuleVariables.Comments_Preceeding_TrueNegative.singleComment",
                                     {"intVar": [], "stringVar": [], "float_var": []}
                                 ),
 
                                 (
-                                    "testModules.partialModuleVariables_Comments_Preceeding_TrueNegative.multiComment",
+                                    "testModules.partialModuleVariables.Comments_Preceeding_TrueNegative.multiComment",
                                     {"myCustomType": []}
                                 ),
                                 
                                 (
-                                    "testModules.partialModuleVariables_Comments_Preceeding_TrueNegative.noComment",
+                                    "testModules.partialModuleVariables.Comments_Preceeding_TrueNegative.noComment",
                                     {"list_var": [], "dict_var": [], "setVar": []}
                                 )
                             ])
@@ -149,7 +149,7 @@ def test_partialModuleVariables_Comments_Preceeding_TrueNegative(testModulePath,
 @pytest.mark.parametrize(("testModulePath", "expectedComments"),
                             [
                                 (
-                                    "testModules.partialModuleVariables_Comments_Inline_TruePositive.singleComment",
+                                    "testModules.partialModuleVariables.Comments_Inline_TruePositive.singleComment",
                                     {"intVar": ["my intvar comment"], "stringVar": ["my stringvar comment"],
                                     "float_var": ["an inline comment"]}
                                 )
@@ -167,12 +167,12 @@ def test_partialModuleVariables_Comments_Inline_TruePositive(testModulePath, exp
 @pytest.mark.parametrize(("testModulePath", "expectedComments"),
                             [
                                 (
-                                    "testModules.partialModuleVariables_Comments_Inline_TrueNegative.singleComment",
+                                    "testModules.partialModuleVariables.Comments_Inline_TrueNegative.singleComment",
                                     {"intVar": [], "stringVar": [], "float_var": []}
                                 ),
                                 
                                 (
-                                    "testModules.partialModuleVariables_Comments_Inline_TrueNegative.noComment",
+                                    "testModules.partialModuleVariables.Comments_Inline_TrueNegative.noComment",
                                     {"list_var": [], "dict_var": [], "setVar": []}
                                 )
                             ])
