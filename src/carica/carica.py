@@ -16,6 +16,7 @@ CFG_FILE_EXT = ".toml"
 DISALLOWED_TOKEN_TYPES = {tokenize.INDENT}
 DISALLOWED_TOKEN_TYPE_VALUES = {tokenize.NAME: {"from", "import"}}
 LINE_DELIMITER_TOKEN_TYPES = {tokenize.NL, tokenize.NEWLINE, tokenize.ENDMARKER}
+IGNORED_TOKEN_TYPES = {tokenize.DEDENT}
 
 
 def log(msg):
@@ -181,7 +182,7 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
                     currentLine.append(token)
 
             # No processing of this token to be performed, record it and move onto the next one in the line
-            else:
+            elif token.type not in IGNORED_TOKEN_TYPES:
                 currentLine.append(token)
         
     return moduleVariables
