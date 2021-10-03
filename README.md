@@ -58,7 +58,7 @@ Carica is a python application configurator, interfacing between a pure python c
 <hr>
 
 ### Credits
-A huge thank you goes to @sdispater, author of the fantastic [tomlkit library](https://github.com/sdispater/tomlkit), which makes this project's variable docstrings retaining features possible.
+A huge thank you goes to [@sdispater](https://github.com/sdispater), author of the fantastic [tomlkit library](https://github.com/sdispater/tomlkit), which makes this project's variable docstrings retaining features possible.
 
 ## Project Goals
 Python applications can be configured in a number of ways, each with its own advantages and limitations.
@@ -198,11 +198,11 @@ welcome_message = "Welcome to the application. Please create an account:"
 
 [new_user_required_fields]
 [new_user_required_fields.username]
-display = "user-name",
+display = "user-name"
 validation_regex = "[a-z]+"
     
 [new_user_required_fields.password]
-display = "pw",
+display = "pw"
 validation_regex = "\\b(?!password\\b)\\w+"
 ```
 
@@ -213,7 +213,7 @@ Carica will map the variables given in your config file to those present in your
 ```toml
 [new_user_required_fields]
 [new_user_required_fields.avatar]
-display = "profile picture",
+display = "profile picture"
 validation_regex = "[a-z]+"
 ```
 
@@ -277,11 +277,11 @@ welcome_message = "Welcome to the application. Please create an account:"
 
 [new_user_required_fields] # Each field should specify a 'display' (formatted field name shown to users) and a 'validation_regex', which inputted values will be checked against
 [new_user_required_fields.username]
-display = "user-name",
+display = "user-name"
 validation_regex = "[a-z]+"
     
 [new_user_required_fields.password]
-display = "pw",
+display = "pw"
 validation_regex = "\\b(?!password\\b)\\w+"
 ```
 
