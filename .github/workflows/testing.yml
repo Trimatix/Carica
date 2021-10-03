@@ -39,6 +39,9 @@ jobs:
         # Reject coverage below 80%
         pytest --cov=. --cov-report=xml:test-coverage.xml --cov-fail-under=80
         
+        # run tests again, but this time output to a txt file for the commenting step
+        pytest --cov=. > pytest-coverage-comment.txt
+        
         # function to parse xml
         # https://stackoverflow.com/questions/893585/how-to-parse-xml-in-bash
         rdom () { local IFS=\> ; read -d \< E C ;}
@@ -89,3 +92,7 @@ jobs:
         message: ${{ env.COVERAGE }}
         color: green
         namedLogo: jest
+    - name: Comment on pull request with test coverage
+      uses: coroo/pytest-coverage-commentator@v1.0.2
+      with:
+        pytest-coverage: pytest-coverage-comment.txt
