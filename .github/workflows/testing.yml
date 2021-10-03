@@ -57,6 +57,7 @@ jobs:
         for el in "${COV_AR[@]}"; do
           if [[ $el == line_rate=\"* ]]; then
             # https://stackoverflow.com/questions/21077882/pattern-to-get-string-between-two-specific-words-characters-using-grep
+            echo Coverage found $(echo grep -oP '(?<=\").*?(?=\")' <<< $el)
             echo "COVERAGE=$(echo grep -oP '(?<=\").*?(?=\")' <<< $el)"# >> $GITHUB_ENV
             break
           fi;
