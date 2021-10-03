@@ -60,8 +60,6 @@
 
 Carica is a python application configurator, interfacing between a pure python config module, and TOML representation of that module.
 
-[TOCM]
-
 <hr>
 
 ### Credits
