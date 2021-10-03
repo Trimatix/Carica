@@ -49,7 +49,7 @@ jobs:
                 COV_LINE=$E;
                 break;
             fi;
-        done < coverage.xml
+        done < test-coverage.xml
         
         # Extract the 'line-rate' (coverage) of the whole project from the coverage tag
         # https://superuser.com/questions/434507/how-to-find-the-index-of-a-word-in-a-string-in-bash
