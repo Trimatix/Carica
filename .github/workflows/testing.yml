@@ -25,7 +25,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .
-        pip install flake8 pytest
+        pip install flake8 pytest pytest-cov
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Lint with flake8
       run: |
@@ -33,6 +33,54 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --statistics
-    - name: Test with pytest
+    - name: Run tests
       run: |
-        pytest
+        # run tests and generate coverage
+        # Reject coverage below 80%
+        pytest --cov=. --cov-report=xml:test-coverage.xml --cov-fail-under=80
+        
+        # function to parse xml
+        # https://stackoverflow.com/questions/893585/how-to-parse-xml-in-bash
+        rdom () { local IFS=\> ; read -d \< E C ;}
+        
+        # parse the coverage file to find the main 'coverage' tag
+        while rdom; do
+            if [[ $E == coverage\ * ]]; then
+                COV_LINE=$E;
+                break;
+            fi;
+        done < coverage.xml
+        
+        # Extract the 'line-rate' (coverage) of the whole project from the coverage tag
+        # https://superuser.com/questions/434507/how-to-find-the-index-of-a-word-in-a-string-in-bash
+        COV_AR=($COV_LINE)
+        for el in "${COV_AR[@]}"; do
+          if [[ $el == line_rate=\"* ]]; then
+            # https://stackoverflow.com/questions/21077882/pattern-to-get-string-between-two-specific-words-characters-using-grep
+            "COVERAGE=$(echo grep -oP '(?<=\").*?(?=\")' <<< $el)"# >> $GITHUB_ENV
+            break
+          fi;
+        done
+
+        # var REF = 'refs/pull/27/merge.json';
+        REF=${{ github.ref }}
+        # console.log('github.ref: ' + REF);
+        echo "github.ref: $REF"
+        # var PATHS = REF.split('/');
+        IFS='/' read -ra PATHS <<< "$REF"
+        # var BRANCH_NAME = PATHS[1] + PATHS[2];
+        BRANCH_NAME="${PATHS[1]}_${PATHS[2]}"
+        # console.log(BRANCH_NAME); // 'pull_27'
+        echo $BRANCH_NAME
+        # process.env.BRANCH = 'pull_27';
+        echo "BRANCH=$(echo ${BRANCH_NAME})" >> $GITHUB_ENV
+    - name: Create test coverage Badge
+      uses: schneegans/dynamic-badges-action@v1.0.0
+      with:
+        auth: ${{ secrets.GIST_SECRET }}
+        gistID: 2551cac90336c1d1073d8615407cc72d
+        filename: Carica__${{ env.BRANCH }}.json
+        label: Test Coverage
+        message: ${{ env.COVERAGE }}
+        color: green
+        namedLogo: jest
