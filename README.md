@@ -212,7 +212,8 @@ validation_regex = "\\b(?!password\\b)\\w+"
 ```
 
 ### Loading a configuration file
-Carica will map the variables given in your config file to those present in your python module:
+Carica will map the variables given in your config file to those present in your python module.
+Since the config python module contains default values, Carica does not require every variable to be specified:
 
 *myConfig.toml*
 ```toml
@@ -222,6 +223,7 @@ display = "profile picture"
 validation_regex = "[a-z]+"
 ```
 
+
 ```py
 >>> import cfg
 >>> import carica
@@ -229,7 +231,7 @@ validation_regex = "[a-z]+"
 Config successfully loaded: myConfig.toml
 >>> import loginApp
 Welcome to the application. Please create an account:
-avatar:
+profile picture:
 123
 Traceback (most recent call last):
   File "<stdin>", line 1, in <module>
