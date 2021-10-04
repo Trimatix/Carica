@@ -24,12 +24,12 @@
   /></a>
 </p>
 <p align="center">
-  <a href="https://pypi.com/project/Carica"
+  <a href="https://pypi.org/project/Carica"
     ><img
       src='https://badgen.net/pypi/v/Carica/'
       alt="Pypi package version"
   /></a>
-  <a href="https://pypi.com/project/Carica"
+  <a href="https://pypi.org/project/Carica"
     ><img
       src="https://img.shields.io/pypi/pyversions/Carica.svg"
       alt="GitHub open enhancement issues"
