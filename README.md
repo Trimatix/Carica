@@ -74,7 +74,7 @@ Python applications can be configured in a number of ways, each with its own adv
 	<tr>
 		<th align="center">Method</th>
 		<th align="center">Advantages</th>
-		<th align="right">Problems</th>
+		<th align="center">Problems</th>
 	</tr>
 	<tr>
 		<td>Environment variables/Command line arguments</td>
