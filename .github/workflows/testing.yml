@@ -88,7 +88,7 @@ jobs:
         auth: ${{ secrets.GIST_SECRET }}
         gistID: 2551cac90336c1d1073d8615407cc72d
         filename: Carica__${{ env.BRANCH }}.json
-        label: Test Coverage
+        label: test coverage
         message: ${{ env.COVERAGE }}
         color: green
         namedLogo: jest
