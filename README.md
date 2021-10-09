@@ -372,7 +372,10 @@ Carica provides serializable models that are ready to use (or extend) in your co
 Removes the need to write boilerplate serializing functionality for dataclasses. This class is intended to be extended, adding definitions for your dataclass's fields. Extensions of `SerializableDataClass` **must** themselves be decorated with `@dataclasses.dataclass` in order to function correctly.
 
 #### SerializablePath
-Aan OS-agnostic filesystem path, extending `pathlib.Path`. The serializing/deserializing behaviour added by this class is minimal, a serialized `SerializablePath` is simply the string representation of the path, for readability. All other behaviour of `pathlib.Path` applies, for example. `SerializablePath` can be instantiated from a single path: `SerializablePath("my/directory/path")`, or from path segments: `SerializablePath("my", "file", "path.toml")`.
+An OS-agnostic filesystem path, extending `pathlib.Path`. The serializing/deserializing behaviour added by this class is minimal, a serialized `SerializablePath` is simply the string representation of the path, for readability. All other behaviour of `pathlib.Path` applies, for example. `SerializablePath` can be instantiated from a single path: `SerializablePath("my/directory/path")`, or from path segments: `SerializablePath("my", "file", "path.toml")`.
+
+#### SerializableTimedelta
+`datetime.datetime` is already considered a primitive type by TomlKit, and so no serializability needs to be added for you to use this class in your configs. However, `datetime.timedelta` is not serializable by default. `SerializableTimedelta` solves this issue as a serializable subclass. As a subclass, all `timedelta` behaiour applies, including the usual constructor. In addition, `SerializableTimedelta.fromTimedelta` is a convenience class method that accepts a `datetime.timedelta` and constructs a new `SerializableTimedelta` from it.
 
 #### Premade models example
 The recommended usage pattern for `SerializableDataClass` is to separate your models into a separate module/package, allowing for 'schema' definition as python code. This pattern is not necessary, model definition *can* be done in your config file.
@@ -389,8 +392,9 @@ class UserDataField(SerializableDataClass):
 ```
 *config.py*
 ```py
-from carica.models import SerializablePath
+from carica.models import SerializablePath, SerializableTimedelta
 from configSchema import UserDataField
+from datetime import datetime
 
 new_user_required_fields = [
     UserDataField(
@@ -405,6 +409,8 @@ new_user_required_fields = [
 ]
 
 database_path = SerializablePath("default/path.csv")
+birthday = datetime(day=1, month=1, year=1500)
+connection_timeout = SerializableTimedelta(minutes=5)
 ```
 
 
