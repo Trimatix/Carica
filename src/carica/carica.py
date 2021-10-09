@@ -141,7 +141,18 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
                             # Store a record of the variable
                             variableName = currentLine[0].string
                             if variableName not in moduleVariables:
-                                variableValue = getattr(module, variableName)
+                                # Plaster solution to ignore false positives
+                                try:
+                                    variableValue = getattr(module, variableName)
+                                except AttributeError:
+                                    # This variable name must be a false positive.
+                                    # Clear the preceeding comments queue, and move onto the next line
+                                    if commentsQueue:
+                                        commentsQueue.clear()
+                                    currentLine = []
+                                    continue
+                                
+                                # Variable value was fetched successfuly, record it
                                 moduleVariables[variableName] = ConfigVariable(variableName, variableValue, [], [])
 
                             # Record any preceeding comments
