@@ -1,10 +1,27 @@
 from carica.interface import ISerializable, PrimativeType
-from pathlib import Path
+from pathlib import Path, WindowsPath, PosixPath
+import os
+
 
 class SerializablePath(ISerializable, Path):
     """A serializable path intended to be treated as a string.
     This class serializes into a usable string.
+
+    This class directly copies the instancing logic of pathlib.Path in order to achieve subclassing.
+    For more details, see the implementation of pathlib.Path, and this stackoverflow thread (which has not been followed):
+    https://stackoverflow.com/questions/29850801/subclass-pathlib-path-fails
     """
+
+    def __new__(cls, *args, **kwargs):
+        if cls is SerializablePath:
+            cls = SerializableWindowsPath if os.name == 'nt' else SerializablePosixPath
+        self = cls._from_parts(args, init=False)
+        if not self._flavour.is_supported:
+            raise NotImplementedError("cannot instantiate %r on your system"
+                                      % (cls.__name__,))
+        self._init()
+        return self
+
 
     def serialize(self, **kwargs) -> str:
         """Return this path as a string.
@@ -41,3 +58,10 @@ class SerializablePath(ISerializable, Path):
             return SerializablePath(*(self.parts + other.parts))
         else:
             raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
+
+
+class SerializableWindowsPath(SerializablePath, WindowsPath):
+    pass
+
+class SerializablePosixPath(SerializablePath, PosixPath):
+    pass
