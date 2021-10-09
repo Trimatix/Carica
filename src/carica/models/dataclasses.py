@@ -4,11 +4,13 @@ from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSeriali
 from typing import Any, Dict, cast
 
 
-@dataclass
+@dataclass(init=True, repr=True)
 class SerializableDataClass(ISerializable):
     """An dataclass with added serialize/deserialize methods.
     Values stored in the fields of the dataclass are not type checked, but must be primatives/serializable for the serialize
     method to return valid results.
+
+    Subclasses of SerializableDataClass *must* be decorated with `@dataclasses.dataclass` to function properly.
     """
 
 
@@ -77,5 +79,4 @@ class SerializableDataClass(ISerializable):
             
             data = cast(Dict[str, Any], data)
 
-        return cls(**data **kwargs) # type: ignore
-    
+        return cls(**data, **kwargs) # type: ignore
