@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from carica.interface import SerializableType, ISerializable, PrimativeType
 from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable
-from typing import Any, Dict, cast
+from typing import Any, Dict, Iterator, List, cast
 
 
 @dataclass(init=True, repr=True)
@@ -12,6 +12,23 @@ class SerializableDataClass(ISerializable):
 
     Subclasses of SerializableDataClass *must* be decorated with `@dataclasses.dataclass` to function properly.
     """
+    @classmethod
+    def _fieldNames(cls) -> List[str]:
+        """Get a list of the field names defined in this class.
+
+        :return: A list of the field names defined in the class.
+        :rtype: List[str]
+        """
+        return list(cls.__dataclass_fields__.keys()) # type: ignore
+
+
+    def _fieldItems(self) -> Dict[str, Any]:
+        """Get a `dict.items()`-style mapping of field names to field values.
+
+        :return: a dictionary mapping field names to current values
+        :rtype: Dict[str, Any]
+        """
+        return {k: getattr(self, k) for k in self.__dataclass_fields__.keys()} # type: ignore
 
 
     @classmethod
