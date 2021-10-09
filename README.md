@@ -365,6 +365,49 @@ Config successfully loaded: myConfig.toml
 some changed value
 ```
 
+### Premade models
+Carica provides serializable models that are ready to use (or extend) in your code. These models can be found in the `carica.models` package, which is imported by default.
+
+#### SerializableDataClass
+Removes the need to write boilerplate serializing functionality for dataclasses. This class is intended to be extended, adding definitions for your dataclass's fields. Extensions of `SerializableDataClass` **must** themselves be decorated with `@dataclasses.dataclass` in order to function correctly.
+
+#### SerializablePath
+Aan OS-agnostic filesystem path, extending `pathlib.Path`. The serializing/deserializing behaviour added by this class is minimal, a serialized `SerializablePath` is simply the string representation of the path, for readability. All other behaviour of `pathlib.Path` applies, for example. `SerializablePath` can be instantiated from a single path: `SerializablePath("my/directory/path")`, or from path segments: `SerializablePath("my", "file", "path.toml")`.
+
+#### Premade models example
+The recommended usage pattern for `SerializableDataClass` is to separate your models into a separate module/package, allowing for 'schema' definition as python code. This pattern is not necessary, model definition *can* be done in your config file.
+
+*configSchema.py*
+```py
+from carica.models import SerializableDataClass
+from dataclasses import dataclass
+
+@dataclass
+class UserDataField(SerializableDataClass):
+    name: str
+    validation_regex: str
+```
+*config.py*
+```py
+from carica.models import SerializablePath
+from configSchema import UserDataField
+
+new_user_required_fields = [
+    UserDataField(
+        name = "user-name"
+        validation_regex = "[a-z]+"
+    ),
+
+    UserDataField(
+        name = "password"
+        validation_regex = "\\b(?!password\\b)\\w+"
+    )
+]
+
+database_path = SerializablePath("default/path.csv")
+```
+
+
 ## Planned features
 - Preceeding comments: This functionality is 'complete' in that it functions as intended and passes all unit tests, however an issue needs to be worked aruond before the feature can be enabled: In order to disambiguate between variables and table fields, the TOML spec requires that arrays and tables be placed at the end of a document. Carica currently depends upon documents being rendered with variables appearing in the same order as they appear in the python config module, which is not guaranteed. This leads to trailing and otherwise misplaced preceeding comments.
 - Config mutation: Carica should allow for loading an existing config, changing some values, and then updating the TOML document with new values. This should retain all formatting from the original document, including variable ordering and any comments that are not present in the python module.
