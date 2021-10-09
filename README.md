@@ -14,7 +14,7 @@
   /></a>
   <a href="https://github.com/Trimatix/Carica/projects/1?card_filter_query=label%3Abug"
     ><img
-      src="https://img.shields.io/github/issues-search?color=eb4034&label=bugs&query=repo%3ATrimatix%2FCarica%20is%3Aopen%20label%3Abug"
+      src="https://img.shields.io/github/issues-search?color=eb4034&label=bug%20reports&query=repo%3ATrimatix%2FCarica%20is%3Aopen%20label%3Abug"
       alt="GitHub open bug reports"
   /></a>
   <a href="https://github.com/Trimatix/Carica/actions"
@@ -74,7 +74,7 @@ Python applications can be configured in a number of ways, each with its own adv
 	<tr>
 		<th align="center">Method</th>
 		<th align="center">Advantages</th>
-		<th align="right">Problems</th>
+		<th align="center">Problems</th>
 	</tr>
 	<tr>
 		<td>Environment variables/Command line arguments</td>
