@@ -9,6 +9,8 @@ PrimativeType = Union[int, float, str, bool, datetime,                          
                         Iterable["PrimativeType"], Mapping[str, "PrimativeType"]]   # type: ignore
 # PrimativeType as a shallow set
 primativeTypes = {int, float, str, bool, Iterable, Mapping, datetime}
+# PrimativeTypes as a shallow tuple
+primativeTypesTuple = tuple(primativeTypes)
 
 
 @runtime_checkable
