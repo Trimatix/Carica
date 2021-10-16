@@ -18,6 +18,8 @@ DISALLOWED_TOKEN_TYPE_VALUES = {tokenize.NAME: {"from", "import"}}
 LINE_DELIMITER_TOKEN_TYPES = {tokenize.NL, tokenize.NEWLINE, tokenize.ENDMARKER}
 IGNORED_TOKEN_TYPES = {tokenize.DEDENT}
 
+VariableTrace = List[Union[int, str]]
+
 
 def log(msg):
     print(msg)
@@ -199,7 +201,7 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
     return moduleVariables
 
 
-def _serialize(o: Any, path: List[Union[str, int]], depthLimit=20, serializerKwargs={}) -> PrimativeType:
+def _serialize(o: Any, path: VariableTrace, depthLimit=20, serializerKwargs={}) -> PrimativeType:
     """Internal recursive method to serialize any serializable object, or throw exceptions with useful key trace info
     """
     # Check recursion depth
@@ -460,7 +462,7 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
 
             # deserialize serializable variables
             if isinstance(default, SerializableType):
-                newValue = type(default).deserialize(newValue)
+                newValue = type(default).deserialize(newValue, c_badTypeHandling=badTypeHandling, c_variableTrace=[varName])
 
             # Handle variables of different types to that which is defined in the python module
             if type(newValue) != type(default):
