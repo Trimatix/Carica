@@ -126,7 +126,9 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
             return None
         else:
             # Otherise require the parameter type
-            return _deserializeField(fieldName, genericArgs[0], serializedValue, **deserializerKwargs)
+            return _deserializeField(fieldName, genericArgs[0], serializedValue,
+                                    c_variableTrace=c_variableTrace, c_badTypeHandling=c_badTypeHandling,
+                                    **deserializerKwargs)
 
     # If type hinted with a normal type or protocol
     elif isinstance(fieldType, type):
@@ -162,7 +164,9 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
             # deserialize the dict
             newValue = {}
             for k, v in cast(Mapping[str, Any], serializedValue).items():
-                newValue[k] = _deserializeField(fieldName, genericArgs[1], v, **deserializerKwargs)
+                newValue[k] = _deserializeField(fieldName, genericArgs[1], v,
+                                                c_variableTrace=c_variableTrace + [k], c_badTypeHandling=c_badTypeHandling,
+                                                **deserializerKwargs)
             return newValue
 
         # If the type hint is like a collection
@@ -183,7 +187,9 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
                                 + "Tuples must be parameterised with a single type, or a type followed by ...")
 
             # deserialize each element in the collection in turn
-            builder = (_deserializeField(fieldName, genericArgs[0], v) for v in serializedValue) # type: ignore
+            builder = (_deserializeField(fieldName, genericArgs[0], v, c_variableTrace=c_variableTrace + [i],
+                                        c_badTypeHandling=c_badTypeHandling, **deserializerKwargs)
+                        for i, v in enumerate(serializedValue)) # type: ignore
             hintedTypes = {List: list, Set: set, Tuple: tuple}
             if generic in hintedTypes:
                 return hintedTypes[generic](builder)
