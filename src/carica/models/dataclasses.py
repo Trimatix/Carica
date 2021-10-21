@@ -215,7 +215,7 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
 
 
 
-@dataclass(init=True, repr=True)
+@dataclass(init=True, repr=True, eq=True)
 class SerializableDataClass(ISerializable):
     """An dataclass with added serialize/deserialize methods.
     Values stored in the fields of the dataclass are not type checked, but must be primatives/serializable for the serialize
