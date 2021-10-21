@@ -37,6 +37,7 @@ def test_dataclasses_loadCfg_loadsCorrectValues(testModulePath, testConfigPath):
     cfgHasDataClass = False
     for varName in testConfigValues:
         if isinstance(getattr(testModule, varName), carica.models.SerializableDataClass):
+            cfgHasDataClass = True
             varValue = getattr(testModule, varName)
             # Make sure the test config actually changes something
             assert not varValue == testConfigValues[varName]
