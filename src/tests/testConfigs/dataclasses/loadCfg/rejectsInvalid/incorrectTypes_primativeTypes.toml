@@ -1,4 +1,4 @@
-[mySerializableField]
+[testVar]
 intVar = "string"
 stringVar = 1
 floatVar = "string"
