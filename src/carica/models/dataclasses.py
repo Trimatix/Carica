@@ -1,12 +1,11 @@
 from dataclasses import Field, dataclass, _MISSING_TYPE
-from token import ERRORTOKEN
 from carica.interface import SerializableType, ISerializable, PrimativeType, primativeTypesTuple
-from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable, objectIsShallowPrimative
+from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable
 from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log
 from carica import exceptions
 import typing
 import traceback
-from typing import Any, Dict, List, Mapping, Optional, Protocol, Set, Tuple, Union, cast, TypeVar
+from typing import Any, Dict, List, Set, Tuple, Union, cast, TypeVar
 from typing import _BaseGenericAlias # type: ignore
 
 FIELD_TYPE_TYPES = (type, _BaseGenericAlias, TypeVar, _MISSING_TYPE)
