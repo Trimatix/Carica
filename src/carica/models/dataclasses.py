@@ -209,7 +209,7 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
             if len(genericArgs) > 1 and genericArgs[1] is not Ellipsis:
                 raise TypeError(f"Field {fieldName} is typed as a tuple with multiple type slots. " \
                                 + "Tuples must be parameterised with a single type, or a type followed by ...")
-
+            
             # deserialize each element in the collection in turn
             builder = (_deserializeField(fieldName, genericArgs[0], v, c_variableTrace=c_variableTrace + [i],
                                         c_badTypeHandling=c_badTypeHandling, **deserializerKwargs)

@@ -1,5 +1,5 @@
 from typing import Any, Iterable, List, Mapping, Union
-from carica.interface import primativeTypes, serializableTypes
+from carica.interface import primativeTypes, serializableTypes, serializableTypesTuple, primativeTypesTuple
 from carica import exceptions
 
 
@@ -32,7 +32,7 @@ def objectIsShallowPrimative(o: Any) -> bool:
     :return: True if o itself is a primative type, False otherwise
     :rtype: bool
     """
-    return any(isinstance(o, t) for t in primativeTypes)
+    return isinstance(o, primativeTypesTuple)
 
 
 def objectIsDeepPrimative(o: Any) -> bool:
@@ -95,7 +95,7 @@ def objectIsShallowSerializable(o: Any) -> bool:
     :return: True if o itself is a primative or serializable type, False otherwise
     :rtype: bool
     """
-    return any(isinstance(o, t) for t in serializableTypes)
+    return isinstance(o, serializableTypesTuple)
 
 
 def objectIsDeepSerializable(o: Any) -> bool:
