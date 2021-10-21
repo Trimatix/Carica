@@ -134,7 +134,7 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
             # Make sure the Union was only parameterised with primative types
             if isinstance(genericType, _BaseGenericAlias):
                 raise TypeError(f"Field {fieldName} is typed as a Union with a generic parameter")
-            if not isinstance(genericType, primativeTypesTuple):
+            if not issubclass(genericType, primativeTypesTuple): # type: ignore
                 raise TypeError(f"Field {fieldName} is typed as a Union with a non-primative parameter")
         
         # Handle optional hints
