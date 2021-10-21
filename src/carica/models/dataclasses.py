@@ -130,6 +130,7 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
         for genericType in genericArgs:
             if genericType is type(None):
                 optional = True
+                continue
             # Make sure the Union was only parameterised with primative types
             if isinstance(genericType, _BaseGenericAlias):
                 raise TypeError(f"Field {fieldName} is typed as a Union with a generic parameter")
