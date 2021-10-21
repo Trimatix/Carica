@@ -7,6 +7,7 @@ import typing
 import traceback
 from typing import Any, Dict, List, Set, Tuple, Union, cast, TypeVar
 from typing import _BaseGenericAlias # type: ignore
+import inspect
 
 FIELD_TYPE_TYPES = (type, _BaseGenericAlias, TypeVar, _MISSING_TYPE)
 FIELD_TYPE_TYPES_UNION = Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE]
@@ -335,4 +336,7 @@ class SerializableDataClass(ISerializable):
                     raise exceptions.NonStringMappingKey(k, path=c_variableTrace)
                 data[k] = _deserializeField(k, cls._typeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
 
-        return cls(**data, **kwargs) # type: ignore
+        constructorArgs = inspect.signature(cls.__init__).parameters
+        classKwargs = {k: v for k, v in kwargs.items() if k in constructorArgs}
+
+        return cls(**data, **classKwargs) # type: ignore
