@@ -126,31 +126,21 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
         if len(genericArgs) == 0:
             raise TypeError(f"Field {fieldName} is a generic type but has not been parameterised")
 
-        # Make sure the Union was only parameterised with primative types
+        optional = False
         for genericType in genericArgs:
+            if genericType is type(None):
+                optional = True
+            # Make sure the Union was only parameterised with primative types
             if isinstance(genericType, _BaseGenericAlias):
                 raise TypeError(f"Field {fieldName} is typed as a Union with a generic parameter")
             if not isinstance(genericType, primativeTypesTuple):
                 raise TypeError(f"Field {fieldName} is typed as a Union with a non-primative parameter")
+        
+        # Handle optional hints
+        if optional and serializedValue is None:
+            return None
 
         return _handleTypeCasts(serializedValue, fieldName, genericArgs, c_badTypeHandling)
-
-    # Handle Optional type hints
-    elif hasattr(fieldType, "__origin__") and fieldType.__origin__ is Optional: # type: ignore
-        # Get the generic parameters
-        genericArgs = cast(Tuple[FIELD_TYPE_TYPES_UNION, ...], typing.get_args(fieldType))
-        # Make sure the type was parameterised
-        if len(genericArgs) == 0:
-            raise TypeError(f"Field {fieldName} is a generic type but has not been parameterised")
-        
-        # Accept None
-        if serializedValue is None:
-            return None
-        else:
-            # Otherise require the parameter type
-            return _deserializeField(fieldName, genericArgs[0], serializedValue,
-                                    c_variableTrace=c_variableTrace, c_badTypeHandling=c_badTypeHandling,
-                                    **deserializerKwargs)
 
     # If type hinted with a normal type or protocol
     elif isinstance(fieldType, type):
