@@ -6,9 +6,12 @@ from tomlkit import items as TKItems
 import os
 from typing import Any, Dict, List, Protocol, Union, Iterable, Mapping, cast, runtime_checkable
 import tokenize
+
+from tomlkit.toml_document import TOMLDocument
 from carica.interface import SerializableType, PrimativeType
 from carica.typeChecking import objectIsShallowPrimative
 from carica import exceptions
+from carica.util import INCOMPATIBLE_TOML_TYPES, convertIncompatibleTomlTypes
 from dataclasses import dataclass
 import traceback
 
@@ -459,6 +462,10 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
                 newValue = cast(_TKItemWithValue, config[varName]).value
             else:
                 continue
+
+            # Convert incompatible types, e.g TOMLDocument
+            if isinstance(newValue, INCOMPATIBLE_TOML_TYPES):
+                newValue = convertIncompatibleTomlTypes(newValue)
 
             # deserialize serializable variables
             if isinstance(default, SerializableType):
