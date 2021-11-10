@@ -6,9 +6,12 @@ from tomlkit import items as TKItems
 import os
 from typing import Any, Dict, List, Protocol, Union, Iterable, Mapping, cast, runtime_checkable
 import tokenize
+
+from tomlkit.toml_document import TOMLDocument
 from carica.interface import SerializableType, PrimativeType
 from carica.typeChecking import objectIsShallowPrimative
 from carica import exceptions
+from carica.util import INCOMPATIBLE_TOML_TYPES, convertIncompatibleTomlTypes
 from dataclasses import dataclass
 import traceback
 
@@ -17,6 +20,8 @@ DISALLOWED_TOKEN_TYPES = {tokenize.INDENT}
 DISALLOWED_TOKEN_TYPE_VALUES = {tokenize.NAME: {"from", "import"}}
 LINE_DELIMITER_TOKEN_TYPES = {tokenize.NL, tokenize.NEWLINE, tokenize.ENDMARKER}
 IGNORED_TOKEN_TYPES = {tokenize.DEDENT}
+
+VariableTrace = List[Union[int, str]]
 
 
 def log(msg):
@@ -199,7 +204,7 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
     return moduleVariables
 
 
-def _serialize(o: Any, path: List[Union[str, int]], depthLimit=20, serializerKwargs={}) -> PrimativeType:
+def _serialize(o: Any, path: VariableTrace, depthLimit=20, serializerKwargs={}) -> PrimativeType:
     """Internal recursive method to serialize any serializable object, or throw exceptions with useful key trace info
     """
     # Check recursion depth
@@ -458,9 +463,13 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
             else:
                 continue
 
+            # Convert incompatible types, e.g TOMLDocument
+            if isinstance(newValue, INCOMPATIBLE_TOML_TYPES):
+                newValue = convertIncompatibleTomlTypes(newValue)
+
             # deserialize serializable variables
             if isinstance(default, SerializableType):
-                newValue = type(default).deserialize(newValue)
+                newValue = type(default).deserialize(newValue, c_badTypeHandling=badTypeHandling, c_variableTrace=[varName])
 
             # Handle variables of different types to that which is defined in the python module
             if type(newValue) != type(default):
