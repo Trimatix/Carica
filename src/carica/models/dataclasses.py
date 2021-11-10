@@ -20,12 +20,12 @@ def _handleTypeCasts(serializedValue: Any, fieldName: str,
 
     if not isinstance(possibleTypes, tuple):
         possibleTypes = (possibleTypes,)
-
-    fieldTypeError = f"Expected one of {'/'.join(str(t) for t in possibleTypes)} for field {fieldName}, " \
-                        + f"but received serialized type {type(serializedValue).__name__}"
     
     # Make sure the serialized type matches
     if not isinstance(serializedValue, cast(Tuple[type], possibleTypes)):
+        fieldTypeError = f"Expected one of {'/'.join(str(t) for t in possibleTypes)} for field {fieldName}, " \
+                        + f"but received serialized type {type(serializedValue).__name__}"
+
         # Attempt to cast incorrect types - useful, for example, for tuples (TOML only has lists)
         if c_badTypeHandling.behaviour == BadTypeBehaviour.CAST:
             # This is only used if there is only one potential type
@@ -330,11 +330,10 @@ class SerializableDataClass(ISerializable):
         if not isinstance(data, dict):
             raise TypeError(f"Invalid serialized {cls.__name__}. Expected Dict[str, PrimativeType], received {type(data).__name__}")
 
-        if deserializeValues and cls._hasISerializableOrGenericField():
-            for k, v in data.items():
-                if not isinstance(k, str):
-                    raise exceptions.NonStringMappingKey(k, path=c_variableTrace)
-                data[k] = _deserializeField(k, cls._typeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
+        for k, v in data.items():
+            if not isinstance(k, str):
+                raise exceptions.NonStringMappingKey(k, path=c_variableTrace)
+            data[k] = _deserializeField(k, cls._typeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
 
         constructorArgs = inspect.signature(cls.__init__).parameters
         classKwargs = {k: v for k, v in kwargs.items() if k in constructorArgs}
