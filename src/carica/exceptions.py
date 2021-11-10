@@ -31,6 +31,8 @@ class KeyTracedException(Exception):
         :type extra: str
         """
         self.o = o
+        if depth is None and path is not None:
+            depth = len(path)
         self.depth = depth
         self.path = path
         self.extra = extra

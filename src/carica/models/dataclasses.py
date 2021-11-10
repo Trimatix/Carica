@@ -1,10 +1,221 @@
-from dataclasses import dataclass
-from carica.interface import SerializableType, ISerializable, PrimativeType
+from dataclasses import Field, dataclass, _MISSING_TYPE
+from carica.interface import SerializableType, ISerializable, PrimativeType, primativeTypesTuple
 from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable
-from typing import Any, Dict, Iterator, List, cast
+from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log
+from carica import exceptions
+import typing
+import traceback
+from typing import Any, Dict, List, Set, Tuple, Union, cast, TypeVar
+from typing import _BaseGenericAlias # type: ignore
+import inspect
+
+FIELD_TYPE_TYPES = (type, _BaseGenericAlias, TypeVar, _MISSING_TYPE)
+FIELD_TYPE_TYPES_UNION = Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE]
+UNCASTABLE_TYPES = (Any, None)
 
 
-@dataclass(init=True, repr=True)
+def _handleTypeCasts(serializedValue: Any, fieldName: str,
+                    possibleTypes: Union[FIELD_TYPE_TYPES_UNION, Tuple[FIELD_TYPE_TYPES_UNION]],
+                    c_badTypeHandling: BadTypeHandling):
+
+    if not isinstance(possibleTypes, tuple):
+        possibleTypes = (possibleTypes,)
+    
+    # Make sure the serialized type matches
+    if not isinstance(serializedValue, cast(Tuple[type], possibleTypes)):
+        fieldTypeError = f"Expected one of {'/'.join(str(t) for t in possibleTypes)} for field {fieldName}, " \
+                        + f"but received serialized type {type(serializedValue).__name__}"
+
+        # Attempt to cast incorrect types - useful, for example, for tuples (TOML only has lists)
+        if c_badTypeHandling.behaviour == BadTypeBehaviour.CAST:
+            # This is only used if there is only one potential type
+            castException: Union[Exception, None] = None
+
+            # Try to cast to each non-Any type
+            for potentialType in possibleTypes:
+                if potentialType not in UNCASTABLE_TYPES:
+                    # We already know that potentialType is not a generic, but we also cannot cast to a TypeVar
+                    if isinstance(potentialType, TypeVar):
+                        log(f"Ignoring potential field type {potentialType} - cannot construct TypeVar")
+                        continue
+                    potentialType = cast(type, potentialType)
+
+                    # Attempt the cast
+                    try:
+                        newValue = potentialType(serializedValue)
+                    # Failed, move onto the next type in the Union
+                    except Exception as e:
+                        castException = e
+                        continue
+                    # Cast was successful
+                    else:
+                        # Log it if required
+                        if c_badTypeHandling.logSuccessfulCast:
+                            log(f"[WARNING] Successfuly casted unexpected type for field {fieldName} from type " \
+                                + f"{type(serializedValue).__name__} to {type(newValue).__name__}")
+                        return newValue
+
+            # No cast was successful.
+            # Add exception trace if we have exactly one
+            if castException is not None and c_badTypeHandling.includeExceptionTrace and len(possibleTypes) == 1:
+                trace = traceback.format_exception(type(castException), castException, castException.__traceback__)
+                fieldTypeError += f". Exception: {trace}"
+            
+            # If Any is allowed, just return the value without erroring
+            if Any in possibleTypes:
+                return serializedValue
+            # Nothing to do if keeping failed field casts, except log if configured to
+            elif c_badTypeHandling.keepFailedCast:
+                if c_badTypeHandling.logTypeKeeping:
+                    log(f"[WARNING] Keeping original value for mistyped field following failed " \
+                        + f"cast. {fieldTypeError}")
+                return serializedValue
+            # Throw errors if set to reject failed casts
+            else:
+                errMsg = f"Casting failed for unexpected type. {fieldTypeError}"
+                if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
+                    raise TypeError(errMsg)
+                elif c_badTypeHandling.rejectType == ErrorHandling.LOG:
+                    log(f"[WARNING] {errMsg}")
+
+        # mismatched type behaviour is not CAST. Do nothing for KEEP except log if required
+        elif c_badTypeHandling.behaviour == BadTypeBehaviour.KEEP:
+            if c_badTypeHandling.logTypeKeeping:
+                log(f"[WARNING] Keeping mistyped field value: {fieldTypeError}")
+            return serializedValue
+
+        # Throw errors etc for REJECT handling
+        elif c_badTypeHandling.behaviour == BadTypeBehaviour.REJECT:
+            if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
+                raise TypeError(fieldTypeError)
+            elif c_badTypeHandling.rejectType == ErrorHandling.LOG:
+                log(fieldTypeError)
+            elif c_badTypeHandling.rejectType == ErrorHandling.IGNORE:
+                pass
+    
+    # serialized value matches the expected types, do nothing
+    else:
+        return serializedValue
+
+
+def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE],
+                        serializedValue: PrimativeType, c_variableTrace: VariableTrace = [],
+                        c_badTypeHandling: BadTypeHandling = BadTypeHandling(), **deserializerKwargs) -> Any:
+    """Deserialize a serialized field value. This is a recursive function able to traverse the type hint tree of a field,
+    and deserialize it as needed.
+
+    :param str fieldName: The name of the field. Used for more helpful error messages.
+    :param fieldType: The type hint of the field in the class, as given by SerializableDataClass._typeOfFieldNamed
+    :type fieldType: Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE]
+    :param PrimativeType serializedValue: The value to deserialize into fieldType
+    :param VariableTrace c_variableTrace: A trace of the variables that the carica deserializer traversed to reach this variable
+    :param BadTypeHandling c_badTypeHandling: How to handle receiving toml variables that do not match the type of the
+                                                python variable. See class for default values and value descriptions.
+    :raise TypeError: If a field has invalid type hints, or serializedValue does not match fieldType
+    :return: serializedValue, deserialized into fieldType
+    """
+    # take any type if type hinted as such
+    if fieldType in (Any, object):
+        return serializedValue
+
+    # Handle Union type hints
+    elif hasattr(fieldType, "__origin__") and fieldType.__origin__ is Union: # type: ignore
+        # Get the generic parameters
+        genericArgs = cast(Tuple[FIELD_TYPE_TYPES_UNION, ...], typing.get_args(fieldType))
+        # Make sure the Union was parameterised
+        if len(genericArgs) == 0:
+            raise TypeError(f"Field {fieldName} is a generic type but has not been parameterised")
+
+        optional = False
+        for genericType in genericArgs:
+            if genericType is type(None):
+                optional = True
+                continue
+            # Make sure the Union was only parameterised with primative types
+            if isinstance(genericType, _BaseGenericAlias):
+                raise TypeError(f"Field {fieldName} is typed as a Union with a generic parameter")
+            if not issubclass(genericType, primativeTypesTuple): # type: ignore
+                raise TypeError(f"Field {fieldName} is typed as a Union with a non-primative parameter")
+        
+        # Handle optional hints
+        if optional and serializedValue is None:
+            return None
+
+        return _handleTypeCasts(serializedValue, fieldName, genericArgs, c_badTypeHandling)
+
+    # If type hinted with a normal type or protocol
+    elif isinstance(fieldType, type):
+        # Deserialize if needed
+        if issubclass(fieldType, SerializableType):
+            return fieldType.deserialize(serializedValue, **deserializerKwargs)
+
+        # Otherwise do nothing
+        elif issubclass(fieldType, primativeTypesTuple):
+            if isinstance(serializedValue, fieldType):
+                return _handleTypeCasts(serializedValue, fieldName, fieldType, c_badTypeHandling)
+            raise TypeError(f"Expected type of {fieldType} for field {fieldName}, " \
+                            + f"but received serialized type {type(serializedValue).__name__}")
+
+    # Handle generics other than Union (e.g List)
+    elif isinstance(fieldType, _BaseGenericAlias):
+        # Get the generic (e.g List, Dict...)
+        generic: _BaseGenericAlias = fieldType.__origin__
+        # If the type hint is like a dict
+        if issubclass(generic, Dict):
+            # Make sure the serialized value matches
+            if not isinstance(serializedValue, Dict):
+                raise TypeError(f"Received serialized value for field {fieldName} of type {type(serializedValue).__name__}" \
+                                + ", but expected dict")
+            # get the type parameters
+            genericArgs = cast(Tuple[FIELD_TYPE_TYPES_UNION, ...], typing.get_args(fieldType))
+            # make sure parameters were supplied
+            if len(genericArgs) == 0:
+                raise TypeError(f"Field {fieldName} is a generic type but has not been parameterised")
+            # make sure we're only expecting str keys
+            if isinstance(genericArgs[0], type) and not issubclass(genericArgs[0], str):
+                raise exceptions.NonStringMappingKey(fieldType, path=c_variableTrace,
+                                                        extra=f"Field {fieldName} is typed as a dict with non-str keys")
+
+            # deserialize the dict
+            newValue = {}
+            for k, v in cast(Dict[str, Any], serializedValue).items():
+                newValue[k] = _deserializeField(fieldName, genericArgs[1], v,
+                                                c_variableTrace=c_variableTrace + [k], c_badTypeHandling=c_badTypeHandling,
+                                                **deserializerKwargs)
+            return newValue
+
+        # If the type hint is like a collection
+        elif issubclass(generic, (List, Set, Tuple)): # type: ignore
+            # Make sure the serialized type matches
+            if not isinstance(serializedValue, (List, Set, Tuple)): # type: ignore
+                raise TypeError(f"Expected type of {fieldType} for field {fieldName}, " \
+                            + f"but received serialized type {type(serializedValue).__name__}")
+
+            # get the type parameters
+            genericArgs = cast(Tuple[FIELD_TYPE_TYPES_UNION, ...], typing.get_args(fieldType))
+            # make sure parameters were supplied
+            if len(genericArgs) == 0:
+                raise TypeError(f"Field {fieldName} is a generic type but has not been parameterised")
+            # make sure only one type was supplied
+            if len(genericArgs) > 1 and genericArgs[1] is not Ellipsis:
+                raise TypeError(f"Field {fieldName} is typed as a tuple with multiple type slots. " \
+                                + "Tuples must be parameterised with a single type, or a type followed by ...")
+            
+            # deserialize each element in the collection in turn
+            builder = (_deserializeField(fieldName, genericArgs[0], v, c_variableTrace=c_variableTrace + [i],
+                                        c_badTypeHandling=c_badTypeHandling, **deserializerKwargs)
+                        for i, v in enumerate(serializedValue)) # type: ignore
+            hintedTypes = {List: list, Set: set, Tuple: tuple}
+            if generic in hintedTypes:
+                return hintedTypes[generic](builder)
+            return generic(builder)
+            
+    # Failed to deserialize
+    raise TypeError(f"Field {fieldName} is typed as a non-serializable type: {fieldType}")
+
+
+
+@dataclass(init=True, repr=True, eq=True)
 class SerializableDataClass(ISerializable):
     """An dataclass with added serialize/deserialize methods.
     Values stored in the fields of the dataclass are not type checked, but must be primatives/serializable for the serialize
@@ -13,13 +224,24 @@ class SerializableDataClass(ISerializable):
     Subclasses of SerializableDataClass *must* be decorated with `@dataclasses.dataclass` to function properly.
     """
     @classmethod
+    def _getFields(cls) -> Dict[str, Field]:
+        """Get the `@dataclass`-generated mapping of field names to `Field`s.
+        Separating this method out to isolate mypy warnings.
+
+        :return: A dictionary mapping field names to `dataclasses.Field`
+        :rtype: Dict[str, Field]
+        """
+        return cls.__dataclass_fields__ # type: ignore
+
+
+    @classmethod
     def _fieldNames(cls) -> List[str]:
         """Get a list of the field names defined in this class.
 
         :return: A list of the field names defined in the class.
         :rtype: List[str]
         """
-        return list(cls.__dataclass_fields__.keys()) # type: ignore
+        return list(cls._getFields().keys())
 
 
     def _fieldItems(self) -> Dict[str, Any]:
@@ -28,27 +250,47 @@ class SerializableDataClass(ISerializable):
         :return: a dictionary mapping field names to current values
         :rtype: Dict[str, Any]
         """
-        return {k: getattr(self, k) for k in self.__dataclass_fields__.keys()} # type: ignore
+        return {k: getattr(self, k) for k in self._fieldNames()}
 
 
     @classmethod
-    def _typeOfFieldNamed(cls, fieldName: str) -> Any:
+    def _typeOfFieldNamed(cls, fieldName: str) -> Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE]:
         """Get the type annotation for the field with the given name.
+        Be aware that type-hintig will cause this function to return a 'typing' type - either a `_GenericAlias` for generics,
+        or `TypeVar` for non-generics.
 
         :return: The type of the field called `fieldName`, or `dataclasses._MISSING_TYPE` if no type was given for the field
         :rtype: type
         """
-        return cls.__dataclass_fields__[fieldName].type # type: ignore
+        return cls._getFields()[fieldName].type
 
 
     @classmethod
-    def _hasISerializableField(cls) -> bool:
-        """Decide whether this class has any fields which are Serializable
+    def _hasISerializableOrGenericField(cls) -> bool:
+        """Decide whether this class has any fields which are Serializable or generic types.
+        If any fields are themselves Serializable types, then we know that we need to traverse the field types tree when
+        deserializing to receive proper types. If any fields are generic, then we do not immediately know if any Serializable
+        generics exist without traversing the field types tree. If we're doing that, then we might as well deserialize while
+        we do it!
 
-        :return: True if at least one field is annotated as a Serializable type, False otherwise
+        :return: False if we are immediately sure no fields contain Serializable types, True otherwise
         :rtype: bool
         """
-        return any(issubclass(cls._typeOfFieldNamed(k), SerializableType) for k in cls.__dataclass_fields__) # type: ignore
+        for fieldName in cls._fieldNames():
+            fieldType = cls._typeOfFieldNamed(fieldName)
+            if not isinstance(fieldType, _MISSING_TYPE):
+                if isinstance(fieldType, type):
+                    if issubclass(fieldType, SerializableType):
+                        return True
+
+                elif isinstance(fieldType, _BaseGenericAlias):
+                    return True
+
+                elif isinstance(fieldType, TypeVar):
+                    if isinstance(fieldType, SerializableType):
+                        return True
+        
+        return False
 
     
     def serialize(self, deepTypeChecking: bool = False, **kwargs) -> Dict[str, PrimativeType]:
@@ -60,14 +302,14 @@ class SerializableDataClass(ISerializable):
         """
         data: Dict[str, PrimativeType] = {}
 
-        for k in self.__dataclass_fields__: # type: ignore
+        for k in self._getFields():
             v = getattr(self, k)
             if isinstance(v, SerializableType):
                 data[k] = v.serialize(**kwargs)
             elif not objectIsShallowSerializable(v):
-                raise TypeError(f"Field '{k}' is of non-serializable type: {type(v).__name__}")
+                raise exceptions.NonSerializableObject(v, extra=f"Field '{k}' is of non-serializable type: {type(v).__name__}")
             elif deepTypeChecking and not objectIsDeepSerializable(v):
-                raise TypeError(f"Field '{k}' has a non-serializable member object")
+                raise exceptions.NonSerializableObject(v, extra=f"Field '{k}' has a non-serializable member object")
             else:
                 data[k] = v
 
@@ -75,7 +317,8 @@ class SerializableDataClass(ISerializable):
 
 
     @classmethod
-    def deserialize(cls, data, deserializeValues: bool = True, **kwargs) -> "SerializableDataClass":
+    def deserialize(cls, data, deserializeValues: bool = True, c_variableTrace: VariableTrace = [],
+                    **kwargs) -> "SerializableDataClass":
         """Recreate a serialized SerializableDataClass object. If `deserializeValues` is `True`,
         values fields which are serializable types will be automatically deserialized.
 
@@ -85,15 +328,14 @@ class SerializableDataClass(ISerializable):
         :rtype: SerializableDataClass
         """
         if not isinstance(data, dict):
-            raise TypeError(f"Invalid type for parameter data. Expected Dict[str, PrimativeType], received {type(data).__name__}")
+            raise TypeError(f"Invalid serialized {cls.__name__}. Expected Dict[str, PrimativeType], received {type(data).__name__}")
 
-        if deserializeValues and cls._hasISerializableField():
-            for k, v in data.items():
-                if not isinstance(k, str):
-                    raise TypeError(f"Invalid serialized {cls.__name__} key '{k}' Expected str, received {type(data).__name__}")
-                if issubclass(cls._typeOfFieldNamed(k), SerializableType) and not isinstance(v, SerializableType):
-                    data[k] = cls._typeOfFieldNamed(k).deserialize(v, **kwargs)
-            
-            data = cast(Dict[str, Any], data)
+        for k, v in data.items():
+            if not isinstance(k, str):
+                raise exceptions.NonStringMappingKey(k, path=c_variableTrace)
+            data[k] = _deserializeField(k, cls._typeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
 
-        return cls(**data, **kwargs) # type: ignore
+        constructorArgs = inspect.signature(cls.__init__).parameters
+        classKwargs = {k: v for k, v in kwargs.items() if k in constructorArgs}
+
+        return cls(**data, **classKwargs) # type: ignore

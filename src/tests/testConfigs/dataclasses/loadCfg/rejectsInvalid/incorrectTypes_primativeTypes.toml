@@ -1,0 +1,7 @@
+[testVar]
+intVar = "string"
+stringVar = 1
+floatVar = "string"
+listVar = 1.0
+aotVar = "string"
+dictVar = "string"

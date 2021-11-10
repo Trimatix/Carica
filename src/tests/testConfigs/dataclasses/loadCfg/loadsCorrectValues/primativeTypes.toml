@@ -1,0 +1,17 @@
+[mySerializableField]
+intVar = 20
+stringVar = "there"
+floatVar = 5.5
+listVar = [10, 10, "bye", 1]
+
+[[mySerializableField.aotVar]]
+myField = "changed"
+
+[[mySerializableField.aotVar]]
+myField = "anothe rone"
+
+[[mySerializableField.aotVar]]
+myField = "extra instance"
+
+[mySerializableField.dictVar]
+myField = "finally"

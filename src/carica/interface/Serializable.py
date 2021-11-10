@@ -4,11 +4,13 @@ from typing import Iterable, Mapping, Union, Protocol, runtime_checkable
 from datetime import datetime
 
 # All types acceptable as toml data. Tomlkit handles serializing of datetime objects automatically.
-# Iterable includes set, list and str. It also includes dict!                       Ignore recursive type errors
+# Iterable includes set, list and tuple. It also includes dict and str!             Ignore recursive type errors
 PrimativeType = Union[int, float, str, bool, datetime,                              # type: ignore
                         Iterable["PrimativeType"], Mapping[str, "PrimativeType"]]   # type: ignore
 # PrimativeType as a shallow set
-primativeTypes = {int, float, str, bool, Iterable, Mapping, datetime}
+primativeTypes = {int, float, str, bool, Iterable, Mapping, datetime, type(None)}
+# PrimativeTypes as a shallow tuple
+primativeTypesTuple = tuple(primativeTypes)
 
 
 @runtime_checkable
@@ -69,3 +71,4 @@ class ISerializable(ABC):
 # All types which are themselves primative, or can be serialized into primative types, as a shallow set
 serializableTypes = primativeTypes.copy()
 serializableTypes.add(SerializableType)
+serializableTypesTuple = tuple(serializableTypes)
