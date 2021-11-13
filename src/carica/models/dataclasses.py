@@ -16,7 +16,11 @@ UNCASTABLE_TYPES = (Any, None)
 
 def _handleTypeCasts(serializedValue: Any, fieldName: str,
                     possibleTypes: Union[FIELD_TYPE_TYPES_UNION, Tuple[FIELD_TYPE_TYPES_UNION]],
-                    c_badTypeHandling: BadTypeHandling):
+                    c_badTypeHandling: BadTypeHandling, _noLog: bool = False):
+
+    def _log(*args, **kwargs):
+        if not _noLog:
+            log(*args, **kwargs)
 
     if not isinstance(possibleTypes, tuple):
         possibleTypes = (possibleTypes,)
@@ -36,7 +40,7 @@ def _handleTypeCasts(serializedValue: Any, fieldName: str,
                 if potentialType not in UNCASTABLE_TYPES:
                     # We already know that potentialType is not a generic, but we also cannot cast to a TypeVar
                     if isinstance(potentialType, TypeVar):
-                        log(f"Ignoring potential field type {potentialType} - cannot construct TypeVar")
+                        _log(f"Ignoring potential field type {potentialType} - cannot construct TypeVar")
                         continue
                     potentialType = cast(type, potentialType)
 
@@ -51,7 +55,7 @@ def _handleTypeCasts(serializedValue: Any, fieldName: str,
                     else:
                         # Log it if required
                         if c_badTypeHandling.logSuccessfulCast:
-                            log(f"[WARNING] Successfuly casted unexpected type for field {fieldName} from type " \
+                            _log(f"[WARNING] Successfuly casted unexpected type for field {fieldName} from type " \
                                 + f"{type(serializedValue).__name__} to {type(newValue).__name__}")
                         return newValue
 
@@ -67,7 +71,7 @@ def _handleTypeCasts(serializedValue: Any, fieldName: str,
             # Nothing to do if keeping failed field casts, except log if configured to
             elif c_badTypeHandling.keepFailedCast:
                 if c_badTypeHandling.logTypeKeeping:
-                    log(f"[WARNING] Keeping original value for mistyped field following failed " \
+                    _log(f"[WARNING] Keeping original value for mistyped field following failed " \
                         + f"cast. {fieldTypeError}")
                 return serializedValue
             # Throw errors if set to reject failed casts
@@ -76,12 +80,12 @@ def _handleTypeCasts(serializedValue: Any, fieldName: str,
                 if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
                     raise TypeError(errMsg)
                 elif c_badTypeHandling.rejectType == ErrorHandling.LOG:
-                    log(f"[WARNING] {errMsg}")
+                    _log(f"[WARNING] {errMsg}")
 
         # mismatched type behaviour is not CAST. Do nothing for KEEP except log if required
         elif c_badTypeHandling.behaviour == BadTypeBehaviour.KEEP:
             if c_badTypeHandling.logTypeKeeping:
-                log(f"[WARNING] Keeping mistyped field value: {fieldTypeError}")
+                _log(f"[WARNING] Keeping mistyped field value: {fieldTypeError}")
             return serializedValue
 
         # Throw errors etc for REJECT handling
@@ -89,7 +93,7 @@ def _handleTypeCasts(serializedValue: Any, fieldName: str,
             if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
                 raise TypeError(fieldTypeError)
             elif c_badTypeHandling.rejectType == ErrorHandling.LOG:
-                log(fieldTypeError)
+                _log(fieldTypeError)
             elif c_badTypeHandling.rejectType == ErrorHandling.IGNORE:
                 pass
     
@@ -100,7 +104,8 @@ def _handleTypeCasts(serializedValue: Any, fieldName: str,
 
 def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE],
                         serializedValue: PrimativeType, c_variableTrace: VariableTrace = [],
-                        c_badTypeHandling: BadTypeHandling = BadTypeHandling(), **deserializerKwargs) -> Any:
+                        c_badTypeHandling: BadTypeHandling = BadTypeHandling(), _noLog: bool = False,
+                        **deserializerKwargs) -> Any:
     """Deserialize a serialized field value. This is a recursive function able to traverse the type hint tree of a field,
     and deserialize it as needed.
 
@@ -114,6 +119,10 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
     :raise TypeError: If a field has invalid type hints, or serializedValue does not match fieldType
     :return: serializedValue, deserialized into fieldType
     """
+    def _log(*args, **kwargs):
+        if not _noLog:
+            log(*args, **kwargs)
+
     # take any type if type hinted as such
     if fieldType in (Any, object):
         return serializedValue
@@ -126,22 +135,39 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
         if len(genericArgs) == 0:
             raise TypeError(f"Field {fieldName} is a generic type but has not been parameterised")
 
-        optional = False
-        for genericType in genericArgs:
-            if genericType is type(None):
-                optional = True
-                continue
-            # Make sure the Union was only parameterised with primative types
-            if isinstance(genericType, _BaseGenericAlias):
-                raise TypeError(f"Field {fieldName} is typed as a Union with a generic parameter")
-            if not issubclass(genericType, primativeTypesTuple): # type: ignore
-                raise TypeError(f"Field {fieldName} is typed as a Union with a non-primative parameter")
+        optional = any(genericType is type(None) for genericType in genericArgs)
         
         # Handle optional hints
         if optional and serializedValue is None:
             return None
+        
+        for genericType in genericArgs:
+            if genericType is not type(None):
+                try:
+                    _deserializeField(fieldName, genericType, serializedValue, c_variableTrace=c_variableTrace,
+                                        c_badTypeHandling=c_badTypeHandling, _noLog=True, **deserializerKwargs)
+                except:
+                    pass
+                else:
+                    return _deserializeField(fieldName, genericType, serializedValue, c_variableTrace=c_variableTrace,
+                                                c_badTypeHandling=c_badTypeHandling, **deserializerKwargs)
+       
+        # We can't cast to a union, and potential casts to parameterized types are handled in the _deserializeField call
+        # Therefore, skip CAST behaviour and jump straight to checking for KEEP
+        fieldTypeError = f"Expected one of {'/'.join(str(t) for t in genericArgs)} for field {fieldName}, " \
+                        + f"but received serialized type {type(serializedValue).__name__}"
 
-        return _handleTypeCasts(serializedValue, fieldName, genericArgs, c_badTypeHandling)
+        if c_badTypeHandling.behaviour == BadTypeBehaviour.KEEP:
+            if c_badTypeHandling.logTypeKeeping:
+                _log(f"[WARNING] Keeping mistyped field value: {fieldTypeError}")
+            return serializedValue
+
+        if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
+            raise TypeError(fieldTypeError)
+        elif c_badTypeHandling.rejectType == ErrorHandling.LOG:
+            _log(fieldTypeError)
+        elif c_badTypeHandling.rejectType == ErrorHandling.IGNORE:
+            pass
 
     # If type hinted with a normal type or protocol
     elif isinstance(fieldType, type):
