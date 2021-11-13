@@ -1,7 +1,5 @@
 import pytest
 import carica
-from carica.carica import BadTypeBehaviour, BadTypeHandling, ErrorHandling
-from caricaTestUtils import tokenizeLine
 import importlib
 import os
 import shutil
