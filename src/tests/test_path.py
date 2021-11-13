@@ -1,16 +1,18 @@
 from typing import Tuple, Union
 import pytest
 from carica.models import SerializablePath
+from os.path import join
+from os import sep
 
 
 @pytest.mark.parametrize(("testPath", "possibleData"),
                             [
-                                (SerializablePath("test/relative/path/to file.toml"),
+                                (SerializablePath(join("test", "relative", "path", "to file.toml")),
                                     (
                                         "test/relative/path/to file.toml",
                                         "test\\relative\\path\\to file.toml"
                                     )),
-                                (SerializablePath("C:/test/windows/file path/like_this.toml"),
+                                (SerializablePath(join(f"C:", sep, "test", "windows", "file path", "like_this.toml")),
                                     (
                                         "C:\\test\\windows\\file path\\like_this.toml",
                                         "C:/test/windows/file path/like_this.toml"
@@ -21,7 +23,7 @@ from carica.models import SerializablePath
                                         "test/relative file path/by-segments.txt",
                                         "test\\relative file path\\by-segments.txt"
                                     )),
-                                (SerializablePath("D:\\", "test", "windows file path", "by segments.mp3"),
+                                (SerializablePath("D:", sep, "test", "windows file path", "by segments.mp3"),
                                     (
                                         "D:\\test\\windows file path\\by segments.mp3",
                                         "D:/test/windows file path/by segments.mp3"
@@ -34,11 +36,17 @@ def test_path_serialize_hasCorrectContents(testPath: SerializablePath, possibleD
 
 @pytest.mark.parametrize(("testData", "expectedPath"),
                             [
-                                ("test/relative/path/to file.toml", SerializablePath("test/relative/path/to file.toml")),
-                                ("test\\relative\\path\\to file.toml", SerializablePath("test/relative/path/to file.toml")),
+                                (
+                                    "test/relative/path/to file.toml",
+                                    SerializablePath(join("test", "relative", "path", "to file.toml"))
+                                ),
+                                (
+                                    "test\\relative\\path\\to file.toml",
+                                    SerializablePath(join("test", "relative", "path", "to file.toml"))
+                                ),
                                 (
                                     "C:\\test\\windows\\file path\\like_this.toml",
-                                    SerializablePath("C:/test/windows/file path/like_this.toml")
+                                    SerializablePath(join("C:", sep, "test", "windows", "file path", "like_this.toml"))
                                 ),
                                 (
                                     "test/relative file path/by-segments.txt",
@@ -50,7 +58,7 @@ def test_path_serialize_hasCorrectContents(testPath: SerializablePath, possibleD
                                 ),
                                 (
                                     "D:\\test\\windows file path\\by segments.mp3",
-                                    SerializablePath("D:/", "test", "windows file path", "by segments.mp3")
+                                    SerializablePath("D:", sep, "test", "windows file path", "by segments.mp3")
                                 )
                             ])
 def test_path_deserialize_hasCorrectContents(testData: str, expectedPath: SerializablePath):
@@ -61,19 +69,19 @@ def test_path_deserialize_hasCorrectContents(testData: str, expectedPath: Serial
 @pytest.mark.parametrize(("basePath", "newPaths", "expectedPath"),
                             [
                                 (
-                                    SerializablePath("some relative/folder"),
+                                    SerializablePath(join("some relative", "folder")),
                                     (
                                         SerializablePath("another folder"),
                                     ),
-                                    SerializablePath("some relative/folder/another folder")
+                                    SerializablePath(join("some relative", "folder", "another folder"))
                                 ),
                                 (
-                                    SerializablePath("some relative/folder"),
+                                    SerializablePath(join("some relative", "folder")),
                                     (
                                         SerializablePath("another folder"),
                                         SerializablePath("then a file.txt")
                                     ),
-                                    SerializablePath("some relative/folder/another folder/then a file.txt")
+                                    SerializablePath(join("some relative", "folder", "another folder", "then a file.txt"))
                                 ),
                                 (
                                     SerializablePath("some relative/folder"),
@@ -81,7 +89,7 @@ def test_path_deserialize_hasCorrectContents(testData: str, expectedPath: Serial
                                         "x",
                                         SerializablePath("y")
                                     ),
-                                    SerializablePath("some relative/folder/x/y")
+                                    SerializablePath(join("some relative", "folder", "x", "y"))
                                 ),
                                 (
                                     SerializablePath("some relative/folder"),
@@ -89,7 +97,7 @@ def test_path_deserialize_hasCorrectContents(testData: str, expectedPath: Serial
                                         "x",
                                         SerializablePath("y", "z.txt")
                                     ),
-                                    SerializablePath("some relative/folder/x/y/z.txt")
+                                    SerializablePath(join("some relative", "folder", "x", "y", "z.txt"))
                                 ),
                                 (
                                     SerializablePath("some relative/folder"),
@@ -98,7 +106,7 @@ def test_path_deserialize_hasCorrectContents(testData: str, expectedPath: Serial
                                         SerializablePath("y"),
                                         "z.txt"
                                     ),
-                                    SerializablePath("some relative/folder/x/y/z.txt")
+                                    SerializablePath(join("some relative", "folder", "x", "y", "z.txt"))
                                 ),
                             ])
 def test_path_addition_isCorrect(basePath: SerializablePath, newPaths: Tuple[Union[SerializablePath, str]],
