@@ -27,7 +27,7 @@ class SerializablePath(ISerializable, Path):
         """Return this path as a string.
 
         :return: The path as a string
-        :rtype: strs
+        :rtype: str
         """
         return str(self)
 
