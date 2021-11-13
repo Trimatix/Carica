@@ -10,7 +10,7 @@ from carica.models import SerializablePath
                                         "test/relative/path/to file.toml",
                                         "test\\relative\\path\\to file.toml"
                                     )),
-                                (SerializablePath("C:\\test\\windows\\file path\\like_this.toml"),
+                                (SerializablePath("C:/test/windows/file path/like_this.toml"),
                                     (
                                         "C:\\test\\windows\\file path\\like_this.toml",
                                         "C:/test/windows/file path/like_this.toml"
@@ -32,43 +32,30 @@ def test_path_serialize_hasCorrectContents(testPath: SerializablePath, possibleD
     assert serialized in possibleData
 
 
-@pytest.mark.parametrize(("testData", "possiblePaths"),
+@pytest.mark.parametrize(("testData", "expectedPath"),
                             [
                                 ("test/relative/path/to file.toml", SerializablePath("test/relative/path/to file.toml")),
                                 ("test\\relative\\path\\to file.toml", SerializablePath("test/relative/path/to file.toml")),
                                 (
                                     "C:\\test\\windows\\file path\\like_this.toml",
-                                    (
-                                        SerializablePath("C:\\test\\windows\\file path\\like_this.toml"),
-                                        SerializablePath("C:/test/windows/file path/like_this.toml")
-                                    )
+                                    SerializablePath("C:/test/windows/file path/like_this.toml")
                                 ),
                                 (
                                     "test/relative file path/by-segments.txt",
-                                    (
-                                        SerializablePath("test", "relative file path", "by-segments.txt"),
-                                    )
+                                    SerializablePath("test", "relative file path", "by-segments.txt")
                                 ),
                                 (
                                     "test\\relative file path\\by-segments.txt",
-                                    (
-                                        SerializablePath("test", "relative file path", "by-segments.txt"),
-                                    )
+                                    SerializablePath("test", "relative file path", "by-segments.txt")
                                 ),
                                 (
                                     "D:\\test\\windows file path\\by segments.mp3",
-                                    (
-                                        SerializablePath("D:/", "test", "windows file path", "by segments.mp3"),
-                                        SerializablePath("D:\\", "test", "windows file path", "by segments.mp3")
-                                    )
+                                    SerializablePath("D:/", "test", "windows file path", "by segments.mp3")
                                 )
                             ])
-def test_path_deserialize_hasCorrectContents(testData: str, possiblePaths: Union[SerializablePath, Tuple[SerializablePath]]):
+def test_path_deserialize_hasCorrectContents(testData: str, expectedPath: SerializablePath):
     deserialized = SerializablePath.deserialize(testData)
-    if isinstance(possiblePaths, SerializablePath):
-        assert deserialized == possiblePaths
-    else:
-        assert deserialized in possiblePaths
+    assert deserialized == expectedPath
 
 
 @pytest.mark.parametrize(("basePath", "newPaths", "expectedPath"),
