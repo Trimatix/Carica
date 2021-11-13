@@ -44,7 +44,7 @@ def test_path_serialize_hasCorrectContents(testPath: SerializablePath, possibleD
                             ])
 def test_path_deserialize_hasCorrectContents(testData: str, expectedPath: SerializablePath):
     deserialized = SerializablePath.deserialize(testData)
-    assert deserialized == expectedPath
+    assert deserialized.serialize().replace("/","\\") == expectedPath.serialize().replace("/","\\")
 
 
 @pytest.mark.parametrize(("basePath", "newPaths", "expectedPath"),
@@ -94,5 +94,5 @@ def test_path_addition_isCorrect(basePath: SerializablePath, newPaths: Tuple[Uni
                                     expectedPath: SerializablePath):
     for path in newPaths:
         basePath += path
-    assert basePath == expectedPath
+    assert basePath.serialize().replace("/","\\") == expectedPath.serialize().replace("/","\\")
     
