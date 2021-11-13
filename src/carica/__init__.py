@@ -3,4 +3,4 @@ from .models import *
 from .interface import *
 from . import exceptions
 
-__version__ = '1.1.1'
+__version__ = '1.2.0'
