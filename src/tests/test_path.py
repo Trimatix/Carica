@@ -17,4 +17,4 @@ from carica.models import SerializablePath
                             ])
 def test_path_serialize_hasCorrectContents(testPath: SerializablePath, possibleData: Tuple[str]):
     serialized = testPath.serialize()
-    return
+    assert serialized in possibleData
