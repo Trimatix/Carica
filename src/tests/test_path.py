@@ -44,7 +44,7 @@ def test_path_serialize_hasCorrectContents(testPath: SerializablePath, possibleD
                             ])
 def test_path_deserialize_hasCorrectContents(testData: str, expectedPath: SerializablePath):
     deserialized = SerializablePath.deserialize(testData)
-    assert deserialized.serialize().replace("/","\\") == expectedPath.serialize().replace("/","\\")
+    assert deserialized == expectedPath
 
 
 @pytest.mark.parametrize(("basePath", "newPaths", "expectedPath"),
