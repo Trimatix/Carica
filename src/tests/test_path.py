@@ -12,22 +12,11 @@ from os import sep
                                         "test/relative/path/to file.toml",
                                         "test\\relative\\path\\to file.toml"
                                     )),
-                                (SerializablePath(join(f"C:", sep, "test", "windows", "file path", "like_this.toml")),
-                                    (
-                                        "C:\\test\\windows\\file path\\like_this.toml",
-                                        "C:/test/windows/file path/like_this.toml"
-                                    )),
-
                                 (SerializablePath("test", "relative file path", "by-segments.txt"),
                                     (
                                         "test/relative file path/by-segments.txt",
                                         "test\\relative file path\\by-segments.txt"
-                                    )),
-                                (SerializablePath("D:", sep, "test", "windows file path", "by segments.mp3"),
-                                    (
-                                        "D:\\test\\windows file path\\by segments.mp3",
-                                        "D:/test/windows file path/by segments.mp3"
-                                    )),
+                                    ))
                             ])
 def test_path_serialize_hasCorrectContents(testPath: SerializablePath, possibleData: Tuple[str]):
     serialized = testPath.serialize()
@@ -45,10 +34,6 @@ def test_path_serialize_hasCorrectContents(testPath: SerializablePath, possibleD
                                     SerializablePath(join("test", "relative", "path", "to file.toml"))
                                 ),
                                 (
-                                    "C:\\test\\windows\\file path\\like_this.toml",
-                                    SerializablePath(join("C:", sep, "test", "windows", "file path", "like_this.toml"))
-                                ),
-                                (
                                     "test/relative file path/by-segments.txt",
                                     SerializablePath("test", "relative file path", "by-segments.txt")
                                 ),
@@ -56,10 +41,6 @@ def test_path_serialize_hasCorrectContents(testPath: SerializablePath, possibleD
                                     "test\\relative file path\\by-segments.txt",
                                     SerializablePath("test", "relative file path", "by-segments.txt")
                                 ),
-                                (
-                                    "D:\\test\\windows file path\\by segments.mp3",
-                                    SerializablePath("D:", sep, "test", "windows file path", "by segments.mp3")
-                                )
                             ])
 def test_path_deserialize_hasCorrectContents(testData: str, expectedPath: SerializablePath):
     deserialized = SerializablePath.deserialize(testData)
@@ -113,5 +94,5 @@ def test_path_addition_isCorrect(basePath: SerializablePath, newPaths: Tuple[Uni
                                     expectedPath: SerializablePath):
     for path in newPaths:
         basePath += path
-    assert basePath.serialize().replace("/","\\") == expectedPath.serialize().replace("/","\\")
+    assert basePath == expectedPath
     
