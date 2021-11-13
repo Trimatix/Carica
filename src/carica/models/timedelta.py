@@ -2,6 +2,8 @@ from typing import Dict
 from carica.interface.Serializable import ISerializable, PrimativeType
 from datetime import timedelta
 
+_KEYS = {"weeks", "days", "hours", "minutes", "seconds", "milliseconds", "microseconds"}
+
 class SerializableTimedelta(ISerializable, timedelta):
     """A serializable version of `datetime.timedelta`. For `datetime.datetime`, no extra handling is needed,
     as datetime is considered a primitive type by TOML.
@@ -34,6 +36,10 @@ class SerializableTimedelta(ISerializable, timedelta):
         
         data["milliseconds"] = 0 if self.microseconds < 1000 else self.microseconds // 1000
         data["microseconds"] = self.microseconds - data["milliseconds"] * 1000
+
+        for k in _KEYS:
+            if data[k] == 0:
+                del data[k]
             
         return data
 
