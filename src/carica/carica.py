@@ -157,7 +157,7 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
                                     currentLine = []
                                     continue
                                 
-                                # Variable value was fetched successfuly, record it
+                                # Variable value was fetched successfully, record it
                                 moduleVariables[variableName] = ConfigVariable(variableName, variableValue, [], [])
 
                             # Record any preceeding comments
@@ -393,7 +393,7 @@ class BadTypeHandling:
     kept silently.
 
     The `logSuccessfulCast` field sets whether to create a log message in the event of a type-mismatched variable being casted
-    to the correct type successfuly. This field is only of use where `behaviour` is `CAST`.
+    to the correct type successfully. This field is only of use where `behaviour` is `CAST`.
 
     The `includeExceptionTrace` field sets whether exception logging should include the exception trace.
 
@@ -507,8 +507,8 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
 
                     # Cast was successful
                     else:
-                        if badTypeHandling.logSuccessfulCast:
-                            log(f"[WARNING] Successfuly casted unexpected type for config variable {varName} from type " \
+                        if badTypeHandling.logSuccessfulCast and type(newValue).__name__ != type(default).__name__:
+                            log(f"[WARNING] Successfully casted unexpected type for config variable {varName} from type " \
                                 + f"{type(newValue).__name__} to {type(default).__name__}")
 
                 # Handle type keeping
@@ -518,7 +518,7 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
                         log(f"[WARNING] Keeping original value for mistype variable {varName}. Expected " \
                             + f"{type(default).__name__}, received {type(newValue).__name__}")
 
-            # Variable value received successfuly, inject into python module
+            # Variable value received successfully, inject into python module
             setattr(cfgModule, varName, newValue)
 
     # No errors encountered

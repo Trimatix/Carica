@@ -55,7 +55,7 @@ def _handleTypeCasts(serializedValue: Any, fieldName: str,
                     else:
                         # Log it if required
                         if c_badTypeHandling.logSuccessfulCast:
-                            _log(f"[WARNING] Successfuly casted unexpected type for field {fieldName} from type " \
+                            _log(f"[WARNING] Successfully casted unexpected type for field {fieldName} from type " \
                                 + f"{type(serializedValue).__name__} to {type(newValue).__name__}")
                         return newValue
 
