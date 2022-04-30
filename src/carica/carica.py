@@ -418,6 +418,182 @@ class BadTypeHandling:
     includeExceptionTrace = False
 
 
+def _firstMatchingDeserialize(defaults: list, newValue, varName: str, c_badTypeHandling: BadTypeHandling, c_variableTrace: List[str]):
+    if len(defaults) == 0:
+        return newValue
+        
+    elemTypes = {type(v): v for v in defaults}
+    if len(elemTypes) == 1:
+        return _deserialize(defaults[0], newValue, varName, c_badTypeHandling, c_variableTrace)
+
+    defaults = elemTypes.values()
+    
+    _handling = BadTypeHandling()
+    _handling.keepFailedCast = False
+    _handling.behaviour = BadTypeBehaviour.REJECT
+    _handling.rejectType = ErrorHandling.RAISE
+    _handling.logTypeKeeping = False
+    _handling.includeExceptionTrace = c_badTypeHandling.includeExceptionTrace
+
+    _withCast = BadTypeHandling()
+    _withCast.keepFailedCast = False
+    _withCast.behaviour = BadTypeBehaviour.CAST
+    _withCast.rejectType = ErrorHandling.RAISE
+    _withCast.logTypeKeeping = False
+    _withCast.includeExceptionTrace = c_badTypeHandling.includeExceptionTrace
+
+    attempts = []
+
+    for candidateDefault in defaults:
+        try:
+            return _deserialize(candidateDefault, newValue, varName, _handling, c_variableTrace)
+        except TypeError:
+            if c_badTypeHandling.behaviour == BadTypeBehaviour.CAST:
+                try:
+                    attempts.append(_deserialize(candidateDefault, newValue, varName, _withCast, c_variableTrace))
+                except TypeError:
+                    pass
+                    
+    if attempts == []:
+        # Handle type rejections
+        if c_badTypeHandling.behaviour == BadTypeBehaviour.REJECT:
+            errMsg = f"Unable to find matching type for element from candidate types in {varName}. received {type(newValue).__name__}"
+            if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
+                raise TypeError(errMsg)
+            elif c_badTypeHandling.behaviour == ErrorHandling.LOG:
+                log(f"[WARNING] {errMsg}")
+                return newValue
+
+        # Handle type casts
+        elif c_badTypeHandling.behaviour == BadTypeBehaviour.CAST:
+            if c_badTypeHandling.keepFailedCast:
+                # Nothing to do if keeping failed variable casts, except log if configured to
+                if c_badTypeHandling.logTypeKeeping:
+                    log(f"[WARNING] Keeping original value for mistype variable {varName}. Unable to find matching type " \
+                        + f"from candidates. received {type(newValue).__name__}")
+            # If configured to reject failed casts
+            else:
+                errMsg = f"Unable to find matching type for element from candidate types in {varName}. received {type(newValue).__name__}"
+                if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
+                    raise TypeError(errMsg)
+                elif c_badTypeHandling.rejectType == ErrorHandling.LOG:
+                    log(f"[WARNING] {errMsg}")
+
+    # At least one type matched
+    else:
+        candidate = attempts[0]
+        if c_badTypeHandling.behaviour == BadTypeBehaviour.CAST:
+            if c_badTypeHandling.logSuccessfulCast:
+                log(f"[WARNING] Selecting candidate type {type(candidate).__name__} for element of {varName}")
+            return candidate
+
+        # Handle type keeping
+        elif c_badTypeHandling.behaviour == BadTypeBehaviour.KEEP:
+            # Nothing to do if keeping mismatched variables, except log if configured to
+            if c_badTypeHandling.logTypeKeeping:
+                log(f"[WARNING] Keeping original value for mistype variable {varName}. Unable to find matching type " \
+                        + f"from candidates. received {type(newValue).__name__}")
+            return newValue
+
+
+def _deserialize(default, newValue, varName: str, c_badTypeHandling: BadTypeHandling, c_variableTrace: List[str]):
+    # deserialize serializable variables
+    if isinstance(default, SerializableType):
+        newValue = type(default).deserialize(newValue, c_badTypeHandling=c_badTypeHandling, c_variableTrace=c_variableTrace)
+
+    if isinstance(default, (list, tuple)):
+        if not isinstance(newValue, (list, tuple)):
+            # Handle type keeping
+            if c_badTypeHandling.behaviour == BadTypeBehaviour.KEEP:
+                # Nothing to do if keeping mismatched variables, except log if configured to
+                if c_badTypeHandling.logTypeKeeping:
+                    log(f"[WARNING] Keeping original value for mistype variable {varName}. Expected " \
+                        + f"{type(default).__name__}, received {type(newValue).__name__}")
+                
+            # Handle type casts
+            elif c_badTypeHandling.behaviour == BadTypeBehaviour.CAST:
+                if c_badTypeHandling.keepFailedCast:
+                    # Nothing to do if keeping failed variable casts, except log if configured to
+                    if c_badTypeHandling.logTypeKeeping:
+                        log(f"[WARNING] Keeping original value for mistype variable {varName}, following failed " \
+                            + f"cast. Expected {type(default).__name__}, received {type(newValue).__name__}," \
+                            + f" cast exception: {formatException(e, c_badTypeHandling.includeExceptionTrace)}")
+
+                # If configured to reject failed casts
+                else:
+                    errMsg = f"Casting failed for unexpected type for config variable {varName}: Expected " \
+                            + f"{type(default).__name__}, received {type(newValue).__name__}. " \
+                            + f"Cast exception: {formatException(e, c_badTypeHandling.includeExceptionTrace)}"
+                    if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
+                        raise TypeError(errMsg)
+                    elif c_badTypeHandling.rejectType == ErrorHandling.LOG:
+                        log(f"[WARNING] {errMsg}")
+
+            # Handle type rejections
+            if c_badTypeHandling.behaviour == BadTypeBehaviour.REJECT:
+                errMsg = f"Unexpected type for config variable {varName}: Expected " \
+                        + f"{type(default).__name__}, received {type(newValue).__name__}"
+                if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
+                    raise TypeError(errMsg)
+                elif c_badTypeHandling.behaviour == ErrorHandling.LOG:
+                    log(f"[WARNING] {errMsg}")
+
+            return newValue
+            
+        _t = tuple if isinstance(default, tuple) else list
+        return _t([_firstMatchingDeserialize(default, v, varName, c_badTypeHandling, c_variableTrace + [str(i)]) for i, v in enumerate(newValue)])
+
+    # Handle variables of different types to that which is defined in the python module
+    if type(newValue) == type(default):
+        return newValue
+
+    # Handle type rejections
+    if c_badTypeHandling.behaviour == BadTypeBehaviour.REJECT:
+        errMsg = f"Unexpected type for config variable {varName}: Expected " \
+                + f"{type(default).__name__}, received {type(newValue).__name__}"
+        if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
+            raise TypeError(errMsg)
+        elif c_badTypeHandling.behaviour == ErrorHandling.LOG:
+            log(f"[WARNING] {errMsg}")
+
+    # Handle type casts
+    elif c_badTypeHandling.behaviour == BadTypeBehaviour.CAST:
+        try:
+            # Attempt casts for incorrect types - useful for things like ints instead of floats.
+            newValue = type(default)(newValue)
+        except Exception as e:
+            if c_badTypeHandling.keepFailedCast:
+                # Nothing to do if keeping failed variable casts, except log if configured to
+                if c_badTypeHandling.logTypeKeeping:
+                    log(f"[WARNING] Keeping original value for mistype variable {varName}, following failed " \
+                        + f"cast. Expected {type(default).__name__}, received {type(newValue).__name__}," \
+                        + f" cast exception: {formatException(e, c_badTypeHandling.includeExceptionTrace)}")
+            # If configured to reject failed casts
+            else:
+                errMsg = f"Casting failed for unexpected type for config variable {varName}: Expected " \
+                        + f"{type(default).__name__}, received {type(newValue).__name__}. " \
+                        + f"Cast exception: {formatException(e, c_badTypeHandling.includeExceptionTrace)}"
+                if c_badTypeHandling.rejectType == ErrorHandling.RAISE:
+                    raise TypeError(errMsg)
+                elif c_badTypeHandling.rejectType == ErrorHandling.LOG:
+                    log(f"[WARNING] {errMsg}")
+
+        # Cast was successful
+        else:
+            if c_badTypeHandling.logSuccessfulCast and type(newValue).__name__ != type(default).__name__:
+                log(f"[WARNING] Successfully casted unexpected type for config variable {varName} from type " \
+                    + f"{type(newValue).__name__} to {type(default).__name__}")
+
+    # Handle type keeping
+    elif c_badTypeHandling.behaviour == BadTypeBehaviour.KEEP:
+        # Nothing to do if keeping mismatched variables, except log if configured to
+        if c_badTypeHandling.logTypeKeeping:
+            log(f"[WARNING] Keeping original value for mistype variable {varName}. Expected " \
+                + f"{type(default).__name__}, received {type(newValue).__name__}")
+
+    return newValue
+
+
 def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandling = BadTypeHandling(),
             badNameHandling: ErrorHandling = ErrorHandling.RAISE):
     """Load the values from a specified config file into attributes of the python cfg module.
@@ -467,56 +643,7 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
             if isinstance(newValue, INCOMPATIBLE_TOML_TYPES):
                 newValue = convertIncompatibleTomlTypes(newValue)
 
-            # deserialize serializable variables
-            if isinstance(default, SerializableType):
-                newValue = type(default).deserialize(newValue, c_badTypeHandling=badTypeHandling, c_variableTrace=[varName])
-
-            # Handle variables of different types to that which is defined in the python module
-            if type(newValue) != type(default):
-
-                # Handle type rejections
-                if badTypeHandling.behaviour == BadTypeBehaviour.REJECT:
-                    errMsg = f"Unexpected type for config variable {varName}: Expected " \
-                            + f"{type(default).__name__}, received {type(newValue).__name__}"
-                    if badTypeHandling.rejectType == ErrorHandling.RAISE:
-                        raise TypeError(errMsg)
-                    elif badTypeHandling.behaviour == ErrorHandling.LOG:
-                        log(f"[WARNING] {errMsg}")
-
-                # Handle type casts
-                elif badTypeHandling.behaviour == BadTypeBehaviour.CAST:
-                    try:
-                        # Attempt casts for incorrect types - useful for things like ints instead of floats.
-                        newValue = type(default)(newValue)
-                    except Exception as e:
-                        if badTypeHandling.keepFailedCast:
-                            # Nothing to do if keeping failed variable casts, except log if configured to
-                            if badTypeHandling.logTypeKeeping:
-                                log(f"[WARNING] Keeping original value for mistype variable {varName}, following failed " \
-                                    + f"cast. Expected {type(default).__name__}, received {type(newValue).__name__}," \
-                                    + f" cast exception: {formatException(e, badTypeHandling.includeExceptionTrace)}")
-                        # If configured to reject failed casts
-                        else:
-                            errMsg = f"Casting failed for unexpected type for config variable {varName}: Expected " \
-                                    + f"{type(default).__name__}, received {type(newValue).__name__}. " \
-                                    + f"Cast exception: {formatException(e, badTypeHandling.includeExceptionTrace)}"
-                            if badTypeHandling.rejectType == ErrorHandling.RAISE:
-                                raise TypeError(errMsg)
-                            elif badTypeHandling.rejectType == ErrorHandling.LOG:
-                                log(f"[WARNING] {errMsg}")
-
-                    # Cast was successful
-                    else:
-                        if badTypeHandling.logSuccessfulCast and type(newValue).__name__ != type(default).__name__:
-                            log(f"[WARNING] Successfully casted unexpected type for config variable {varName} from type " \
-                                + f"{type(newValue).__name__} to {type(default).__name__}")
-
-                # Handle type keeping
-                elif badTypeHandling.behaviour == BadTypeBehaviour.KEEP:
-                    # Nothing to do if keeping mismatched variables, except log if configured to
-                    if badTypeHandling.logTypeKeeping:
-                        log(f"[WARNING] Keeping original value for mistype variable {varName}. Expected " \
-                            + f"{type(default).__name__}, received {type(newValue).__name__}")
+            newValue = _deserialize(default, newValue, varName, badTypeHandling, [varName])
 
             # Variable value received successfully, inject into python module
             setattr(cfgModule, varName, newValue)
