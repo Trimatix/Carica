@@ -472,7 +472,7 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
                 newValue = type(default).deserialize(newValue, c_badTypeHandling=badTypeHandling, c_variableTrace=[varName])
 
             # Handle variables of different types to that which is defined in the python module
-            if type(newValue) != type(default):
+            if not isinstance(newValue, type(default)):
 
                 # Handle type rejections
                 if badTypeHandling.behaviour == BadTypeBehaviour.REJECT:
