@@ -1,7 +1,19 @@
-from typing import Any, Iterable, List, Mapping, Union
+from typing import Any, Generic, Iterable, List, Mapping, TypeVar, Union, cast
+from typing import _BaseGenericAlias # type: ignore
 from carica.interface import primativeTypes, serializableTypes, serializableTypesTuple, primativeTypesTuple
 from carica import exceptions
+from wrapt import ObjectProxy
 
+TypeHint = Union[type, _BaseGenericAlias]
+
+class _DeserializedTypeOverrideProxy(ObjectProxy):
+    def __init__(self, wrapped, typeOverride: TypeHint):
+        super().__init__(wrapped)
+        self._self__carica_uninitialized_type__ = typeOverride
+
+T = TypeVar("T")
+def TypeOverride(override: TypeHint, defaultValue: T) -> T:
+    return cast(T, _DeserializedTypeOverrideProxy(defaultValue, override))
 
 def objectIsObjectIterable(o: Any) -> bool:
     """Decide whether o is an iterable of objects.

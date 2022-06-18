@@ -1,0 +1,13 @@
+intVar = "20"
+stringVar = "test"
+floatVar = -13.2
+listVar = ["bye", 42]
+
+[dictVar]
+myField = "val1"
+
+[[aotVar]]
+myField = "val2"
+
+[[aotVar]]
+myField = "val3"

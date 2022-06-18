@@ -1,6 +1,6 @@
 from dataclasses import Field, dataclass, _MISSING_TYPE
 from carica.interface import SerializableType, ISerializable, PrimativeType, primativeTypesTuple
-from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable
+from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable, _DeserializedTypeOverrideProxy
 from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log
 from carica import exceptions
 import typing
@@ -292,6 +292,21 @@ class SerializableDataClass(ISerializable):
 
 
     @classmethod
+    def _uninitializedTypeOfFieldNamed(cls, fieldName: str) -> Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE]:
+        """Get the type annotation for the field with the given name, with awareness for pre-initialization types.
+        Be aware that type-hintig will cause this function to return a 'typing' type - either a `_GenericAlias` for generics,
+        or `TypeVar` for non-generics.
+
+        :return: The pre-initialization type of the field called `fieldName`, or `dataclasses._MISSING_TYPE` if no type was given for the field
+        :rtype: type
+        """
+        f = cls._getFields()[fieldName]
+        if isinstance(f.default, _DeserializedTypeOverrideProxy):
+            return f.default._self__carica_uninitialized_type__
+        return f.type
+
+
+    @classmethod
     def _hasISerializableOrGenericField(cls) -> bool:
         """Decide whether this class has any fields which are Serializable or generic types.
         If any fields are themselves Serializable types, then we know that we need to traverse the field types tree when
@@ -359,7 +374,7 @@ class SerializableDataClass(ISerializable):
         for k, v in data.items():
             if not isinstance(k, str):
                 raise exceptions.NonStringMappingKey(k, path=c_variableTrace)
-            data[k] = _deserializeField(k, cls._typeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
+            data[k] = _deserializeField(k, cls._uninitializedTypeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
 
         constructorArgs = inspect.signature(cls.__init__).parameters
         classKwargs = {k: v for k, v in kwargs.items() if k in constructorArgs}
