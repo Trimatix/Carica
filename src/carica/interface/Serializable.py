@@ -41,8 +41,8 @@ class SerializableType(Protocol):
 TSelf = TypeVar("TSelf")
 
 class ISerializable(ABC):
-    """An object which can be represented entirely by a dictionary of primitives, created with the toDict method.
-    This object can then be recreated perfectly using the fromDict method.
+    """An object which can be represented entirely by a dictionary of primitives, created with the serialize method.
+    This object can then be recreated perfectly using the deserialize method.
     """
     
     @abstractmethod
