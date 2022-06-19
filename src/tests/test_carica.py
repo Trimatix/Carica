@@ -7,6 +7,7 @@ import importlib
 import os
 import shutil
 import tomlkit
+from tomlkit.items import container
 
 
 TESTS_TEMP_DIR = "testsTemp"
@@ -390,7 +391,9 @@ def test_loadCfg_typeCasting_allowsCastFailKeeping(testModulePath, testConfigPat
 
     # Make sure the config values have not changed
     for varName in defaults:
-        assert carica.carica._serialize(getattr(testModule, varName), [varName]) == testConfigValues[varName].value
+        loadedValue = testConfigValues[varName]
+        if not isinstance(loadedValue, container.Container): continue
+        assert carica.carica._serialize(getattr(testModule, varName), [varName]) == loadedValue.value
 
 
 @pytest.mark.parametrize(("testModulePath", "testConfigPath"),

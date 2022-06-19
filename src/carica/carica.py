@@ -102,7 +102,8 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
     :return: An estimated dict of variables defined in module. See above for details and limitations.
     :rtype: Dict[str, ConfigVariable]
     """
-    with tokenize.open(module.__file__) as f:
+    # TODO: Ignoring a warning here because virtual modules are not supported yet
+    with tokenize.open(module.__file__) as f: # type: ignore[reportGeneralTypeIssues]
         tokens = tokenize.generate_tokens(f.readline)
         # All detected variables
         moduleVariables: Dict[str, ConfigVariable] = {}
@@ -491,7 +492,9 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
                     if isinstance(defaultType, type):
                         try:
                             # Attempt casts for incorrect types - useful for things like ints instead of floats.
-                            newValue = defaultType(newValue)
+                            # TODO: Ignoring a warning here because we intentionally don't know the type or therefore the init signature
+                            # In the future I will type this with a protocol before trying the instantiation
+                            newValue = defaultType(newValue) # type: ignore[reportGeneralTypeIssues]
                         except Exception as e:
                             if badTypeHandling.keepFailedCast:
                                 # Nothing to do if keeping failed variable casts, except log if configured to

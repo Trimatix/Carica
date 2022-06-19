@@ -185,7 +185,8 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
     # Handle generics other than Union (e.g List)
     elif isinstance(fieldType, _BaseGenericAlias):
         # Get the generic (e.g List, Dict...)
-        generic: _BaseGenericAlias = fieldType.__origin__
+        # ignoring a warning here on missing attribute - I can't import _BaseGenericAlias, so the type hinter doesn't know that __origin__ is guaranteed
+        generic: _BaseGenericAlias = fieldType.__origin__ # type: ignore
         # If the type hint is like a dict
         if issubclass(generic, Dict):
             # Make sure the serialized value matches

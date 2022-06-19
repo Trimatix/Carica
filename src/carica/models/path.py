@@ -15,7 +15,9 @@ class SerializablePath(ISerializable, Path):
     def __new__(cls, *args, **kwargs):
         if cls is SerializablePath:
             cls = SerializableWindowsPath if os.name == 'nt' else SerializablePosixPath
-        self = cls._from_parts(args, init=False)
+        # ignoring a warning here on missing method _from_parts
+        # the OS-specific serializable path subclasses still transitively extend Path, so _from_parts is guaranteed
+        self = cls._from_parts(args, init=False) # type: ignore[reportGeneralTypeIssues]
         if not self._flavour.is_supported:
             raise NotImplementedError("cannot instantiate %r on your system"
                                       % (cls.__name__,))

@@ -11,12 +11,12 @@ class MySerializableClass:
 
 
     @classmethod
-    def deserialize(self, data, **kwargs):
+    def deserialize(cls, data, **kwargs):
         return MySerializableClass(data["myField"])
 
     
     def __eq__(self, o: object) -> bool:
-        return type(o) == MySerializableClass and o.myField == self.myField
+        return isinstance(o, MySerializableClass) and o.myField == self.myField
 
 
     def __str__(self):
