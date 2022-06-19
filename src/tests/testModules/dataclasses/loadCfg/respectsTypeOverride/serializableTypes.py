@@ -1,4 +1,6 @@
+from typing import cast
 from carica.models import SerializableDataClass
+from carica.typeChecking import TypeOverride
 from dataclasses import dataclass
 
 class MySerializableClass:
@@ -14,19 +16,11 @@ class MySerializableClass:
     def deserialize(cls, data, **kwargs):
         return MySerializableClass(data["myField"])
 
-    
-    def __eq__(self, o: object) -> bool:
-        return isinstance(o, MySerializableClass) and o.myField == self.myField
-
-
-    def __str__(self):
-        return f"<myField={self.myField}>"
-
 
 @dataclass
 class MySerializableDataClass(SerializableDataClass):
-    myField: MySerializableClass
+    myField: int = TypeOverride(MySerializableClass, cast(int, MySerializableClass))
 
 testVar = MySerializableDataClass(
-    myField = MySerializableClass("test")
+    myField = cast(int, MySerializableClass("test"))
 )

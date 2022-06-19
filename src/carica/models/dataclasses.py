@@ -1,11 +1,13 @@
-from dataclasses import Field, dataclass, _MISSING_TYPE
+from dataclasses import Field, dataclass, _MISSING_TYPE, fields
 from carica.interface import SerializableType, ISerializable, PrimativeType, primativeTypesTuple
-from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable
+from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable, _DeserializedTypeOverrideProxy
 from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log
 from carica import exceptions
 import typing
 import traceback
 from typing import Any, Dict, List, Set, Tuple, Union, cast, TypeVar
+# ignoring a warning here because private type _BaseGenericAlias can't be imported right now.
+# it is a necessary import to unify over user-defined and special generics.
 from typing import _BaseGenericAlias # type: ignore
 import inspect
 
@@ -128,6 +130,7 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
         return serializedValue
 
     # Handle Union type hints
+    # Ignoring a warning here for missing attribute __origin__ - i just checked for it!
     elif hasattr(fieldType, "__origin__") and fieldType.__origin__ is Union: # type: ignore
         # Get the generic parameters
         genericArgs = cast(Tuple[FIELD_TYPE_TYPES_UNION, ...], typing.get_args(fieldType))
@@ -185,7 +188,8 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
     # Handle generics other than Union (e.g List)
     elif isinstance(fieldType, _BaseGenericAlias):
         # Get the generic (e.g List, Dict...)
-        generic: _BaseGenericAlias = fieldType.__origin__
+        # ignoring a warning here on missing attribute - I can't import _BaseGenericAlias, so the type hinter doesn't know that __origin__ is guaranteed
+        generic: _BaseGenericAlias = fieldType.__origin__ # type: ignore
         # If the type hint is like a dict
         if issubclass(generic, Dict):
             # Make sure the serialized value matches
@@ -211,9 +215,9 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
             return newValue
 
         # If the type hint is like a collection
-        elif issubclass(generic, (List, Set, Tuple)): # type: ignore
+        elif issubclass(generic, (List, Set, Tuple)):
             # Make sure the serialized type matches
-            if not isinstance(serializedValue, (List, Set, Tuple)): # type: ignore
+            if not isinstance(serializedValue, (List, Set, Tuple)):
                 raise TypeError(f"Expected type of {fieldType} for field {fieldName}, " \
                             + f"but received serialized type {type(serializedValue).__name__}")
 
@@ -257,7 +261,7 @@ class SerializableDataClass(ISerializable):
         :return: A dictionary mapping field names to `dataclasses.Field`
         :rtype: Dict[str, Field]
         """
-        return cls.__dataclass_fields__ # type: ignore
+        return {field.name: field for field in fields(cls)}
 
 
     @classmethod
@@ -276,19 +280,43 @@ class SerializableDataClass(ISerializable):
         :return: a dictionary mapping field names to current values
         :rtype: Dict[str, Any]
         """
-        return {k: getattr(self, k) for k in self._fieldNames()}
+        return {k: getattr(self, k) for k in self._fieldNames()} #self.__dataclass_fields__
 
 
     @classmethod
     def _typeOfFieldNamed(cls, fieldName: str) -> Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE]:
-        """Get the type annotation for the field with the given name.
-        Be aware that type-hintig will cause this function to return a 'typing' type - either a `_GenericAlias` for generics,
-        or `TypeVar` for non-generics.
+        """Get the type annotation for the field with the given name. This does not consider type overriding.
+        Be aware that type-hinting will cause this function to return a 'typing' type.
 
         :return: The type of the field called `fieldName`, or `dataclasses._MISSING_TYPE` if no type was given for the field
         :rtype: type
         """
         return cls._getFields()[fieldName].type
+
+
+    @classmethod
+    def _overriddenTypeOfFieldNamed(cls, fieldName: str) -> Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE]:
+        """Get the type annotation for the field with the given name, with awareness for overridden types.
+        Be aware that type-hinting will cause this function to return a 'typing' type.
+
+        :return: The (possibly overridden) type of the field called `fieldName`, or `dataclasses._MISSING_TYPE` if no type was given for the field
+        :rtype: type
+        """
+        f = cls._getFields()[fieldName]
+        if isinstance(f.default, _DeserializedTypeOverrideProxy):
+            return f.default._self__carica_uninitialized_type__
+        return f.type
+
+
+    @classmethod
+    def _fieldTypeIsOverridden(cls, fieldName: str) -> bool:
+        """Decide whether the deserialized type for a field has been overridden.
+
+        :return: True if the field called `fieldName` was marked with `TypeOverride`, False otherwise
+        :rtype: type
+        """
+        f = cls._getFields()[fieldName]
+        return isinstance(f.default, _DeserializedTypeOverrideProxy)
 
 
     @classmethod
@@ -359,9 +387,9 @@ class SerializableDataClass(ISerializable):
         for k, v in data.items():
             if not isinstance(k, str):
                 raise exceptions.NonStringMappingKey(k, path=c_variableTrace)
-            data[k] = _deserializeField(k, cls._typeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
+            data[k] = _deserializeField(k, cls._overriddenTypeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
 
         constructorArgs = inspect.signature(cls.__init__).parameters
         classKwargs = {k: v for k, v in kwargs.items() if k in constructorArgs}
 
-        return cls(**data, **classKwargs) # type: ignore
+        return cls(**data, **classKwargs)

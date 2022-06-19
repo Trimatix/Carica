@@ -4,9 +4,8 @@ from typing import Iterable, Mapping, Union, Protocol, runtime_checkable
 from datetime import datetime
 
 # All types acceptable as toml data. Tomlkit handles serializing of datetime objects automatically.
-# Iterable includes set, list and tuple. It also includes dict and str!             Ignore recursive type errors
-PrimativeType = Union[int, float, str, bool, datetime,                              # type: ignore
-                        Iterable["PrimativeType"], Mapping[str, "PrimativeType"]]   # type: ignore
+# Iterable includes set, list and tuple. It also includes dict and str!
+PrimativeType = Union[int, float, str, bool, datetime, Iterable["PrimativeType"], Mapping[str, "PrimativeType"]]   
 # PrimativeType as a shallow set
 primativeTypes = {int, float, str, bool, Iterable, Mapping, datetime, type(None)}
 # PrimativeTypes as a shallow tuple

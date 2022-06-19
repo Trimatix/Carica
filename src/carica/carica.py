@@ -9,7 +9,7 @@ import tokenize
 
 from tomlkit.toml_document import TOMLDocument
 from carica.interface import SerializableType, PrimativeType
-from carica.typeChecking import objectIsShallowPrimative
+from carica.typeChecking import objectIsShallowPrimative, _DeserializedTypeOverrideProxy, TypeHint
 from carica import exceptions
 from carica.util import INCOMPATIBLE_TOML_TYPES, convertIncompatibleTomlTypes
 from dataclasses import dataclass
@@ -61,6 +61,7 @@ class ConfigVariable:
     value: Any
     inlineComments: List[str]
     preComments: List[str]
+    loadedType: TypeHint
 
 
     def hasInline(self):
@@ -101,7 +102,8 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
     :return: An estimated dict of variables defined in module. See above for details and limitations.
     :rtype: Dict[str, ConfigVariable]
     """
-    with tokenize.open(module.__file__) as f:
+    # TODO: Ignoring a warning here because virtual modules are not supported yet
+    with tokenize.open(module.__file__) as f: # type: ignore[reportGeneralTypeIssues]
         tokens = tokenize.generate_tokens(f.readline)
         # All detected variables
         moduleVariables: Dict[str, ConfigVariable] = {}
@@ -158,7 +160,8 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
                                     continue
                                 
                                 # Variable value was fetched successfully, record it
-                                moduleVariables[variableName] = ConfigVariable(variableName, variableValue, [], [])
+                                loadedType = variableValue._self__carica_uninitialized_type__ if isinstance(variableValue, _DeserializedTypeOverrideProxy) else type(variableValue)
+                                moduleVariables[variableName] = ConfigVariable(variableName, variableValue, [], [], loadedType)
 
                             # Record any preceeding comments
                             if commentsQueue:
@@ -186,7 +189,8 @@ def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
                         # Create a record for the variable if none exists
                         if variableName not in moduleVariables:
                             variableValue = getattr(module, variableName)
-                            moduleVariables[variableName] = ConfigVariable(variableName, variableValue, [], [])
+                            loadedType = variableValue._self__carica_uninitialized_type__ if isinstance(variableValue, _DeserializedTypeOverrideProxy) else type(variableValue)
+                            moduleVariables[variableName] = ConfigVariable(variableName, variableValue, [], [], loadedType)
 
                         # Record the found inline comment
                         moduleVariables[variableName].inlineComments.append(token.string.lstrip("# "))
@@ -453,13 +457,13 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
                 log(f"[WARNING] Ignoring unrecognised config variable name: {varName}")
 
         else:
-            # Get default value for variable
-            default = defaults[varName].value
+            # Get the type of the default value (or the type override) for this variable
+            defaultType = defaults[varName].loadedType
+
             # Get the value for the variable that is defined in the config file
-            newValue: Any
             # This check ignores any config attributes that do not have a value, for example comments and whitespace.
             if isinstance(config[varName], _TKItemWithValue):
-                newValue = cast(_TKItemWithValue, config[varName]).value
+                newValue: Any = cast(_TKItemWithValue, config[varName]).value
             else:
                 continue
 
@@ -468,16 +472,16 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
                 newValue = convertIncompatibleTomlTypes(newValue)
 
             # deserialize serializable variables
-            if isinstance(default, SerializableType):
-                newValue = type(default).deserialize(newValue, c_badTypeHandling=badTypeHandling, c_variableTrace=[varName])
+            if issubclass(defaultType, SerializableType):
+                newValue = defaultType.deserialize(newValue, c_badTypeHandling=badTypeHandling, c_variableTrace=[varName])
 
             # Handle variables of different types to that which is defined in the python module
-            if not isinstance(newValue, type(default)):
+            if not isinstance(newValue, defaultType):
 
                 # Handle type rejections
                 if badTypeHandling.behaviour == BadTypeBehaviour.REJECT:
                     errMsg = f"Unexpected type for config variable {varName}: Expected " \
-                            + f"{type(default).__name__}, received {type(newValue).__name__}"
+                            + f"{defaultType.__name__}, received {type(newValue).__name__}"
                     if badTypeHandling.rejectType == ErrorHandling.RAISE:
                         raise TypeError(errMsg)
                     elif badTypeHandling.behaviour == ErrorHandling.LOG:
@@ -485,38 +489,56 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
 
                 # Handle type casts
                 elif badTypeHandling.behaviour == BadTypeBehaviour.CAST:
-                    try:
-                        # Attempt casts for incorrect types - useful for things like ints instead of floats.
-                        newValue = type(default)(newValue)
-                    except Exception as e:
+                    if isinstance(defaultType, type):
+                        try:
+                            # Attempt casts for incorrect types - useful for things like ints instead of floats.
+                            # TODO: Ignoring a warning here because we intentionally don't know the type or therefore the init signature
+                            # In the future I will type this with a protocol before trying the instantiation
+                            newValue = defaultType(newValue) # type: ignore[reportGeneralTypeIssues]
+                        except Exception as e:
+                            if badTypeHandling.keepFailedCast:
+                                # Nothing to do if keeping failed variable casts, except log if configured to
+                                if badTypeHandling.logTypeKeeping:
+                                    log(f"[WARNING] Keeping original value for mistype variable {varName}, following failed " \
+                                        + f"cast. Expected {defaultType.__name__}, received {type(newValue).__name__}," \
+                                        + f" cast exception: {formatException(e, badTypeHandling.includeExceptionTrace)}")
+                            # If configured to reject failed casts
+                            else:
+                                errMsg = f"Casting failed for unexpected type for config variable {varName}: Expected " \
+                                        + f"{defaultType.__name__}, received {type(newValue).__name__}. " \
+                                        + f"Cast exception: {formatException(e, badTypeHandling.includeExceptionTrace)}"
+                                if badTypeHandling.rejectType == ErrorHandling.RAISE:
+                                    raise TypeError(errMsg)
+                                elif badTypeHandling.rejectType == ErrorHandling.LOG:
+                                    log(f"[WARNING] {errMsg}")
+
+                        # Cast was successful
+                        else:
+                            if badTypeHandling.logSuccessfulCast and type(newValue).__name__ != defaultType.__name__:
+                                log(f"[WARNING] Successfully casted unexpected type for config variable {varName} from type " \
+                                    + f"{type(newValue).__name__} to {defaultType.__name__}")
+                    else:
                         if badTypeHandling.keepFailedCast:
                             # Nothing to do if keeping failed variable casts, except log if configured to
                             if badTypeHandling.logTypeKeeping:
-                                log(f"[WARNING] Keeping original value for mistype variable {varName}, following failed " \
-                                    + f"cast. Expected {type(default).__name__}, received {type(newValue).__name__}," \
-                                    + f" cast exception: {formatException(e, badTypeHandling.includeExceptionTrace)}")
+                                log(f"[WARNING] Keeping original value for mistype variable {varName}, cast not attempted. " \
+                                    + f"Cannot instance typing type hint {defaultType!s}. Received {type(newValue).__name__}")
                         # If configured to reject failed casts
                         else:
-                            errMsg = f"Casting failed for unexpected type for config variable {varName}: Expected " \
-                                    + f"{type(default).__name__}, received {type(newValue).__name__}. " \
-                                    + f"Cast exception: {formatException(e, badTypeHandling.includeExceptionTrace)}"
+                            errMsg = f"Cast not attempted for unexpected type for config variable {varName}: " \
+                                    + f"Cannot instance typing type hint {defaultType!s}. Received {type(newValue).__name__}"
                             if badTypeHandling.rejectType == ErrorHandling.RAISE:
                                 raise TypeError(errMsg)
                             elif badTypeHandling.rejectType == ErrorHandling.LOG:
                                 log(f"[WARNING] {errMsg}")
 
-                    # Cast was successful
-                    else:
-                        if badTypeHandling.logSuccessfulCast and type(newValue).__name__ != type(default).__name__:
-                            log(f"[WARNING] Successfully casted unexpected type for config variable {varName} from type " \
-                                + f"{type(newValue).__name__} to {type(default).__name__}")
 
                 # Handle type keeping
                 elif badTypeHandling.behaviour == BadTypeBehaviour.KEEP:
                     # Nothing to do if keeping mismatched variables, except log if configured to
                     if badTypeHandling.logTypeKeeping:
                         log(f"[WARNING] Keeping original value for mistype variable {varName}. Expected " \
-                            + f"{type(default).__name__}, received {type(newValue).__name__}")
+                            + f"{defaultType.__name__}, received {type(newValue).__name__}")
 
             # Variable value received successfully, inject into python module
             setattr(cfgModule, varName, newValue)

@@ -1,11 +1,13 @@
 import pytest
 import carica
+from carica import typeChecking
 from carica.carica import BadTypeBehaviour, BadTypeHandling, ErrorHandling
-from caricaTestUtils import tokenizeLine
+from tests.caricaTestUtils import tokenizeLine
 import importlib
 import os
 import shutil
 import tomlkit
+from tomlkit import container
 
 
 TESTS_TEMP_DIR = "testsTemp"
@@ -389,4 +391,29 @@ def test_loadCfg_typeCasting_allowsCastFailKeeping(testModulePath, testConfigPat
 
     # Make sure the config values have not changed
     for varName in defaults:
-        assert carica.carica._serialize(getattr(testModule, varName), [varName]) == testConfigValues[varName].value
+        loadedValue = testConfigValues[varName]
+        if not isinstance(loadedValue, container.Container): continue
+        assert carica.carica._serialize(getattr(testModule, varName), [varName]) == loadedValue.value
+
+
+@pytest.mark.parametrize(("testModulePath", "testConfigPath"),
+                            [
+                                ("testModules.loadCfg.respectsTypeOverride.primativeTypes",
+                                    "src/tests/testConfigs/loadCfg/respectsTypeOverride/primativeTypes.toml"),
+                                ("testModules.loadCfg.respectsTypeOverride.serializableTypes",
+                                    "src/tests/testConfigs/loadCfg/respectsTypeOverride/serializableTypes.toml"),
+                            ])
+def test_loadCfg_respectsTypeOverride(testModulePath, testConfigPath):
+    testModule = importlib.import_module(testModulePath)
+    with open(testConfigPath, "r") as f:
+        testConfigValues = tomlkit.loads(f.read())
+
+    # Make sure the test config actually changes something
+    assert any(isinstance(getattr(testModule, varName), typeChecking._DeserializedTypeOverrideProxy) for varName in testConfigValues)
+
+    carica.loadCfg(testModule, testConfigPath)
+
+    # Make sure the config values were loaded in with the overridden type
+    for varName in testConfigValues:
+        if isinstance(getattr(testModule, varName), typeChecking._DeserializedTypeOverrideProxy):
+            assert isinstance(testConfigValues[varName], getattr(testModule, varName).loadedType)
