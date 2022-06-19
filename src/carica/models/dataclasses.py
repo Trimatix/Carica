@@ -278,13 +278,13 @@ class SerializableDataClass(SerializesToDict):
         return list(cls._getFields().keys())
 
 
-    def _fieldItems(self) -> Dict[str, Any]:
+    def _fieldItems(self):
         """Get a `dict.items()`-style mapping of field names to field values.
 
         :return: a dictionary mapping field names to current values
         :rtype: Dict[str, Any]
         """
-        return {k: getattr(self, k) for k in self._fieldNames()} #self.__dataclass_fields__
+        return {k: getattr(self, k) for k in self._fieldNames()}.items() #self.__dataclass_fields__
 
 
     @classmethod
