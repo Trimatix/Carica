@@ -1,11 +1,11 @@
 from dataclasses import Field, dataclass, _MISSING_TYPE, fields
-from carica.interface import SerializableType, ISerializable, PrimativeType, primativeTypesTuple
+from carica.interface import SerializableType, ISerializable, PrimativeType, primativeTypesTuple, SerializesToDict
 from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable, _DeserializedTypeOverrideProxy
 from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log
 from carica import exceptions
 import typing
 import traceback
-from typing import Any, Dict, List, Set, Tuple, Union, cast, TypeVar
+from typing import Any, Dict, List, Mapping, Set, Tuple, Union, cast, TypeVar
 # ignoring a warning here because private type _BaseGenericAlias can't be imported right now.
 # it is a necessary import to unify over user-defined and special generics.
 from typing import _BaseGenericAlias # type: ignore
@@ -250,7 +250,7 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
 
 
 @dataclass(init=True, repr=True, eq=True)
-class SerializableDataClass(ISerializable):
+class SerializableDataClass(SerializesToDict):
     """An dataclass with added serialize/deserialize methods.
     Values stored in the fields of the dataclass are not type checked, but must be primatives/serializable for the serialize
     method to return valid results.
@@ -375,7 +375,7 @@ class SerializableDataClass(ISerializable):
 
 
     @classmethod
-    def deserialize(cls, data, deserializeValues: bool = True, c_variableTrace: VariableTrace = [], **kwargs):
+    def deserialize(cls, data: Mapping[str, PrimativeType], deserializeValues: bool = True, c_variableTrace: VariableTrace = [], **kwargs):
         """Recreate a serialized SerializableDataClass object. If `deserializeValues` is `True`,
         values fields which are serializable types will be automatically deserialized.
 
