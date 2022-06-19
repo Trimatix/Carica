@@ -1,5 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Generic, Iterable, Mapping, Type, TypeVar, Union, Protocol, runtime_checkable
 from datetime import datetime
 
@@ -41,7 +41,7 @@ class SerializableType(Protocol):
 TSelf = TypeVar("TSelf")
 
 class ISerializable(Generic[TSelf]):
-    """An object which can be represented entirely by a dictionary of primitives, created with the toDict method.
+    """An object w`hich can be represented entirely by a dictionary of primitives, created with the toDict method.
     This object can then be recreated perfectly using the fromDict method.
     """
     
@@ -71,3 +71,5 @@ class ISerializable(Generic[TSelf]):
 serializableTypes = primativeTypes.copy()
 serializableTypes.add(SerializableType)
 serializableTypesTuple = tuple(serializableTypes)
+
+
