@@ -12,6 +12,8 @@ primativeTypes = {int, float, str, bool, Iterable, Mapping, datetime, type(None)
 # PrimativeTypes as a shallow tuple
 primativeTypesTuple = tuple(primativeTypes)
 
+TClass = TypeVar("TClass")
+
 @runtime_checkable
 class SerializableType(Protocol):
     """A type protocol representing any object with `serialize` and `deserialize` methods defined.
@@ -30,7 +32,7 @@ class SerializableType(Protocol):
 
 
     @classmethod
-    def deserialize(cls, data: PrimativeType, **kwargs) -> SerializableType:
+    def deserialize(cls: Type[TClass], data: PrimativeType, **kwargs) -> TClass:
         """Recreate a serialized Serializable-like object
 
         :param PrimativeType data: A primative (likely a dictionary) containing all information needed to recreate the serialized object
@@ -38,8 +40,7 @@ class SerializableType(Protocol):
         :rtype: Serializable-like
         """
         ...
-
-TSelf = TypeVar("TSelf")
+        
 
 class ISerializable(ABC):
     """An object which can be represented entirely by a dictionary of primitives, created with the serialize method.
@@ -58,7 +59,7 @@ class ISerializable(ABC):
 
     @classmethod
     @abstractmethod
-    def deserialize(cls: Type[TSelf], data: PrimativeType, **kwargs) -> TSelf:
+    def deserialize(cls: Type[TClass], data: PrimativeType, **kwargs) -> TClass:
         """Recreate a serialized ISerializable object
 
         :param PrimativeType data: A primative (likely a dictionary) containing all information needed to recreate the serialized object
