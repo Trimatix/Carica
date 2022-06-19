@@ -2,7 +2,7 @@ import pytest
 import carica
 from carica import typeChecking
 from carica.carica import BadTypeBehaviour, BadTypeHandling, ErrorHandling
-from caricaTestUtils import tokenizeLine
+from tests.caricaTestUtils import tokenizeLine
 import importlib
 import os
 import shutil
