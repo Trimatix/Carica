@@ -6,6 +6,8 @@ from carica import exceptions
 import typing
 import traceback
 from typing import Any, Dict, List, Set, Tuple, Union, cast, TypeVar
+# ignoring a warning here because private type _BaseGenericAlias can't be imported right now.
+# it is a necessary import to unify over user-defined and special generics.
 from typing import _BaseGenericAlias # type: ignore
 import inspect
 
@@ -128,6 +130,7 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
         return serializedValue
 
     # Handle Union type hints
+    # Ignoring a warning here for missing attribute __origin__ - i just checked for it!
     elif hasattr(fieldType, "__origin__") and fieldType.__origin__ is Union: # type: ignore
         # Get the generic parameters
         genericArgs = cast(Tuple[FIELD_TYPE_TYPES_UNION, ...], typing.get_args(fieldType))
@@ -212,9 +215,9 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
             return newValue
 
         # If the type hint is like a collection
-        elif issubclass(generic, (List, Set, Tuple)): # type: ignore
+        elif issubclass(generic, (List, Set, Tuple)):
             # Make sure the serialized type matches
-            if not isinstance(serializedValue, (List, Set, Tuple)): # type: ignore
+            if not isinstance(serializedValue, (List, Set, Tuple)):
                 raise TypeError(f"Expected type of {fieldType} for field {fieldName}, " \
                             + f"but received serialized type {type(serializedValue).__name__}")
 
@@ -389,4 +392,4 @@ class SerializableDataClass(ISerializable):
         constructorArgs = inspect.signature(cls.__init__).parameters
         classKwargs = {k: v for k, v in kwargs.items() if k in constructorArgs}
 
-        return cls(**data, **classKwargs) # type: ignore
+        return cls(**data, **classKwargs)

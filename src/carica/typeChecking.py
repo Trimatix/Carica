@@ -1,6 +1,8 @@
-from typing import Any, Generic, Iterable, List, Mapping, TypeVar, Union, cast
+from typing import Any, Iterable, List, Mapping, TypeVar, Union, cast
+# ignoring a warning here because private type _BaseGenericAlias can't be imported right now.
+# it is a necessary import to unify over user-defined and special generics.
 from typing import _BaseGenericAlias # type: ignore
-from carica.interface import primativeTypes, serializableTypes, serializableTypesTuple, primativeTypesTuple
+from carica.interface import serializableTypesTuple, primativeTypesTuple
 from carica import exceptions
 from wrapt import ObjectProxy
 
