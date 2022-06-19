@@ -1,11 +1,11 @@
 from dataclasses import Field, dataclass, _MISSING_TYPE, fields
-from carica.interface import SerializableType, ISerializable, PrimativeType, primativeTypesTuple
+from carica.interface import SerializableType, ISerializable, PrimativeType, primativeTypesTuple, SerializesToDict
 from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable, _DeserializedTypeOverrideProxy
 from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log
 from carica import exceptions
 import typing
 import traceback
-from typing import Any, Dict, List, Set, Tuple, Union, cast, TypeVar
+from typing import Any, Dict, List, Mapping, Set, Tuple, Union, cast, TypeVar
 # ignoring a warning here because private type _BaseGenericAlias can't be imported right now.
 # it is a necessary import to unify over user-defined and special generics.
 from typing import _BaseGenericAlias # type: ignore
@@ -107,7 +107,7 @@ def _handleTypeCasts(serializedValue: Any, fieldName: str,
 def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE],
                         serializedValue: PrimativeType, c_variableTrace: VariableTrace = [],
                         c_badTypeHandling: BadTypeHandling = BadTypeHandling(), _noLog: bool = False,
-                        **deserializerKwargs) -> Any:
+                        deserializeSerializable: bool = True, **deserializerKwargs) -> Any:
     """Deserialize a serialized field value. This is a recursive function able to traverse the type hint tree of a field,
     and deserialize it as needed.
 
@@ -118,6 +118,7 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
     :param VariableTrace c_variableTrace: A trace of the variables that the carica deserializer traversed to reach this variable
     :param BadTypeHandling c_badTypeHandling: How to handle receiving toml variables that do not match the type of the
                                                 python variable. See class for default values and value descriptions.
+    :param bool deserializeValues: Whether to automatically deserialize serialized Serializable fields (Default True)
     :raise TypeError: If a field has invalid type hints, or serializedValue does not match fieldType
     :return: serializedValue, deserialized into fieldType
     """
@@ -176,7 +177,10 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
     elif isinstance(fieldType, type):
         # Deserialize if needed
         if issubclass(fieldType, SerializableType):
-            return fieldType.deserialize(serializedValue, **deserializerKwargs)
+            if deserializeSerializable:
+                return fieldType.deserialize(serializedValue, **deserializerKwargs)
+            else:
+                return serializedValue
 
         # Otherwise do nothing
         elif issubclass(fieldType, primativeTypesTuple):
@@ -246,7 +250,7 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
 
 
 @dataclass(init=True, repr=True, eq=True)
-class SerializableDataClass(ISerializable):
+class SerializableDataClass(SerializesToDict):
     """An dataclass with added serialize/deserialize methods.
     Values stored in the fields of the dataclass are not type checked, but must be primatives/serializable for the serialize
     method to return valid results.
@@ -371,8 +375,7 @@ class SerializableDataClass(ISerializable):
 
 
     @classmethod
-    def deserialize(cls, data, deserializeValues: bool = True, c_variableTrace: VariableTrace = [],
-                    **kwargs) -> "SerializableDataClass":
+    def deserialize(cls, data: Mapping[str, PrimativeType], deserializeValues: bool = True, c_variableTrace: VariableTrace = [], **kwargs):
         """Recreate a serialized SerializableDataClass object. If `deserializeValues` is `True`,
         values fields which are serializable types will be automatically deserialized.
 
@@ -387,7 +390,8 @@ class SerializableDataClass(ISerializable):
         for k, v in data.items():
             if not isinstance(k, str):
                 raise exceptions.NonStringMappingKey(k, path=c_variableTrace)
-            data[k] = _deserializeField(k, cls._overriddenTypeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
+            data[k] = _deserializeField(k, cls._overriddenTypeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], 
+                                        deserializeSerializable=deserializeValues, **kwargs)
 
         constructorArgs = inspect.signature(cls.__init__).parameters
         classKwargs = {k: v for k, v in kwargs.items() if k in constructorArgs}

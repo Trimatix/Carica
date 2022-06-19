@@ -1,6 +1,8 @@
-from typing import Dict
+from typing import Dict, TypeVar, Type
 from carica.interface.Serializable import ISerializable, PrimativeType
 from datetime import timedelta
+
+TSelf = TypeVar("TSelf", bound="SerializableTimedelta")
 
 class SerializableTimedelta(ISerializable, timedelta):
     """A serializable version of `datetime.timedelta`. For `datetime.datetime`, no extra handling is needed,
@@ -39,7 +41,7 @@ class SerializableTimedelta(ISerializable, timedelta):
 
 
     @classmethod
-    def deserialize(cls, data: PrimativeType, **kwargs) -> ISerializable:
+    def deserialize(cls: Type[TSelf], data: PrimativeType, **kwargs) -> TSelf:
         if not isinstance(data, dict):
             raise TypeError(f"Invalid serialized {cls.__name__}: {data}")
         return cls(**data)

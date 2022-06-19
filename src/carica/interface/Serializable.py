@@ -1,16 +1,15 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Iterable, Mapping, Union, Protocol, runtime_checkable
+from typing import Generic, Iterable, Mapping, Type, TypeVar, Union, Protocol, runtime_checkable
 from datetime import datetime
 
 # All types acceptable as toml data. Tomlkit handles serializing of datetime objects automatically.
 # Iterable includes set, list and tuple. It also includes dict and str!
-PrimativeType = Union[int, float, str, bool, datetime, Iterable["PrimativeType"], Mapping[str, "PrimativeType"]]   
+PrimativeType = Union[int, float, str, bool, datetime, Iterable["PrimativeType"], Mapping[str, "PrimativeType"]]
 # PrimativeType as a shallow set
 primativeTypes = {int, float, str, bool, Iterable, Mapping, datetime, type(None)}
 # PrimativeTypes as a shallow tuple
 primativeTypesTuple = tuple(primativeTypes)
-
 
 @runtime_checkable
 class SerializableType(Protocol):
@@ -39,6 +38,7 @@ class SerializableType(Protocol):
         """
         ...
 
+TSelf = TypeVar("TSelf")
 
 class ISerializable(ABC):
     """An object which can be represented entirely by a dictionary of primitives, created with the toDict method.
@@ -57,7 +57,7 @@ class ISerializable(ABC):
 
     @classmethod
     @abstractmethod
-    def deserialize(cls, data: PrimativeType, **kwargs) -> ISerializable:
+    def deserialize(cls: Type[TSelf], data: PrimativeType, **kwargs) -> TSelf:
         """Recreate a serialized ISerializable object
 
         :param PrimativeType data: A primative (likely a dictionary) containing all information needed to recreate the serialized object
@@ -71,3 +71,14 @@ class ISerializable(ABC):
 serializableTypes = primativeTypes.copy()
 serializableTypes.add(SerializableType)
 serializableTypesTuple = tuple(serializableTypes)
+
+TClass = TypeVar("TClass")
+TSerialized = TypeVar("TSerialized", bound=PrimativeType)
+
+class SerializesToType(SerializableType, Generic[TSerialized]):
+    def serialize(self, **kwargs) -> TSerialized: ...
+
+    @classmethod
+    def deserialize(cls: Type[TClass], data: TSerialized, **kwargs) -> TClass: ...
+
+SerializesToDict = SerializesToType[Mapping[str, PrimativeType]]

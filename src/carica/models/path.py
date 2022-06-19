@@ -1,7 +1,9 @@
+from typing import Type, TypeVar
 from carica.interface import ISerializable, PrimativeType
 from pathlib import Path, WindowsPath, PosixPath
 import os
 
+TSelf = TypeVar("TSelf", bound="SerializablePath")
 
 class SerializablePath(ISerializable, Path):
     """A serializable path intended to be treated as a string.
@@ -12,7 +14,7 @@ class SerializablePath(ISerializable, Path):
     https://stackoverflow.com/questions/29850801/subclass-pathlib-path-fails
     """
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args, **kwargs) -> "SerializablePath":
         if cls is SerializablePath:
             cls = SerializableWindowsPath if os.name == 'nt' else SerializablePosixPath
         # ignoring a warning here on missing method _from_parts
@@ -35,7 +37,7 @@ class SerializablePath(ISerializable, Path):
 
 
     @classmethod
-    def deserialize(cls, data: PrimativeType, **kwargs) -> "SerializablePath":
+    def deserialize(cls: Type[TSelf], data: PrimativeType, **kwargs) -> TSelf:
         """Form a SerializablePath from a string. Separation of the path into parts is handled by pathlib.Path logic.
 
         :param str data: The path to deserialize, as an os.sep-separated string of path parts.
@@ -44,10 +46,10 @@ class SerializablePath(ISerializable, Path):
         """
         if not isinstance(data, str):
             raise TypeError(f"Invalid type for parameter data. Expected str, received {type(data).__name__}")
-        return SerializablePath(data)
+        return cls(data)
 
 
-    def __add__(self, other: object) -> "SerializablePath":
+    def __add__(self: TSelf, other: object) -> TSelf:
         """Concatenate two paths into a new SerializablePath. Neither this nor other are modified.
 
         :param other: The path to appear on the right-hand side of the new path
@@ -55,9 +57,9 @@ class SerializablePath(ISerializable, Path):
         :return: A new SerializablePath containing this path followed by other, separated with os.sep as necessary
         """
         if isinstance(other, str):
-            return SerializablePath(*(self.parts + (other,)))
+            return type(self)(*(self.parts + (other,)))
         elif isinstance(other, Path):
-            return SerializablePath(*(self.parts + other.parts))
+            return type(self)(*(self.parts + other.parts))
         else:
             raise TypeError(f"Incompatible types: {type(self).__name__} and {type(other).__name__}")
 
