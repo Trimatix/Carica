@@ -1,11 +1,12 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Generic, Iterable, Mapping, Type, TypeVar, Union, Protocol, runtime_checkable
+from typing import Generic, Iterable, Mapping, Type, TypeVar, Union, Protocol, runtime_checkable, Optional
 from datetime import datetime
 
 # All types acceptable as toml data. Tomlkit handles serializing of datetime objects automatically.
 # Iterable includes set, list and tuple. It also includes dict and str!
-PrimativeType = Union[int, float, str, bool, datetime, Iterable["PrimativeType"], Mapping[str, "PrimativeType"]]
+# this type is Optional, because None is allowed in toml, but there is no NoneType exposed in python for use in the Union.
+PrimativeType = Optional[Union[int, float, str, bool, datetime, Iterable["PrimativeType"], Mapping[str, "PrimativeType"]]]
 # PrimativeType as a shallow set
 primativeTypes = {int, float, str, bool, Iterable, Mapping, datetime, type(None)}
 # PrimativeTypes as a shallow tuple
