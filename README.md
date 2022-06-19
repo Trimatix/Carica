@@ -32,7 +32,7 @@
   <a href="https://pypi.org/project/Carica"
     ><img
       src="https://img.shields.io/pypi/pyversions/Carica.svg"
-      alt="GitHub open enhancement issues"
+      alt="Minimum supported Python version"
   /></a>
   <a href="https://github.com/Trimatix/Carica/blob/master/LICENSE"
     ><img
