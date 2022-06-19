@@ -1,4 +1,4 @@
-from dataclasses import Field, dataclass, _MISSING_TYPE
+from dataclasses import Field, dataclass, _MISSING_TYPE, fields
 from carica.interface import SerializableType, ISerializable, PrimativeType, primativeTypesTuple
 from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable, _DeserializedTypeOverrideProxy
 from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log
@@ -257,7 +257,7 @@ class SerializableDataClass(ISerializable):
         :return: A dictionary mapping field names to `dataclasses.Field`
         :rtype: Dict[str, Field]
         """
-        return cls.__dataclass_fields__ # type: ignore
+        return {field.name: field for field in fields(cls)}
 
 
     @classmethod
@@ -276,14 +276,13 @@ class SerializableDataClass(ISerializable):
         :return: a dictionary mapping field names to current values
         :rtype: Dict[str, Any]
         """
-        return {k: getattr(self, k) for k in self._fieldNames()}
+        return {k: getattr(self, k) for k in self._fieldNames()} #self.__dataclass_fields__
 
 
     @classmethod
     def _typeOfFieldNamed(cls, fieldName: str) -> Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE]:
-        """Get the type annotation for the field with the given name.
-        Be aware that type-hintig will cause this function to return a 'typing' type - either a `_GenericAlias` for generics,
-        or `TypeVar` for non-generics.
+        """Get the type annotation for the field with the given name. This does not consider type overriding.
+        Be aware that type-hinting will cause this function to return a 'typing' type.
 
         :return: The type of the field called `fieldName`, or `dataclasses._MISSING_TYPE` if no type was given for the field
         :rtype: type
@@ -292,18 +291,28 @@ class SerializableDataClass(ISerializable):
 
 
     @classmethod
-    def _uninitializedTypeOfFieldNamed(cls, fieldName: str) -> Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE]:
-        """Get the type annotation for the field with the given name, with awareness for pre-initialization types.
-        Be aware that type-hintig will cause this function to return a 'typing' type - either a `_GenericAlias` for generics,
-        or `TypeVar` for non-generics.
+    def _overriddenTypeOfFieldNamed(cls, fieldName: str) -> Union[type, _BaseGenericAlias, TypeVar, _MISSING_TYPE]:
+        """Get the type annotation for the field with the given name, with awareness for overridden types.
+        Be aware that type-hinting will cause this function to return a 'typing' type.
 
-        :return: The pre-initialization type of the field called `fieldName`, or `dataclasses._MISSING_TYPE` if no type was given for the field
+        :return: The (possibly overridden) type of the field called `fieldName`, or `dataclasses._MISSING_TYPE` if no type was given for the field
         :rtype: type
         """
         f = cls._getFields()[fieldName]
         if isinstance(f.default, _DeserializedTypeOverrideProxy):
             return f.default._self__carica_uninitialized_type__
         return f.type
+
+
+    @classmethod
+    def _fieldTypeIsOverridden(cls, fieldName: str) -> bool:
+        """Decide whether the deserialized type for a field has been overridden.
+
+        :return: True if the field called `fieldName` was marked with `TypeOverride`, False otherwise
+        :rtype: type
+        """
+        f = cls._getFields()[fieldName]
+        return isinstance(f.default, _DeserializedTypeOverrideProxy)
 
 
     @classmethod
@@ -374,7 +383,7 @@ class SerializableDataClass(ISerializable):
         for k, v in data.items():
             if not isinstance(k, str):
                 raise exceptions.NonStringMappingKey(k, path=c_variableTrace)
-            data[k] = _deserializeField(k, cls._uninitializedTypeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
+            data[k] = _deserializeField(k, cls._overriddenTypeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], **kwargs)
 
         constructorArgs = inspect.signature(cls.__init__).parameters
         classKwargs = {k: v for k, v in kwargs.items() if k in constructorArgs}

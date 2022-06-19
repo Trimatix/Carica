@@ -1,9 +1,12 @@
+from typing import Dict, List
 import pytest
 import carica
+from carica import typeChecking
 import importlib
 import os
 import shutil
 import tomlkit
+from tomlkit.items import AbstractTable
 
 
 TESTS_TEMP_DIR = "testsTemp"
@@ -120,3 +123,47 @@ def test_makeDefaultCfg_rejectsInvalid(testModulePath, expectedException):
         carica.makeDefaultCfg(testModule, fileName=outputPath)
     
     cleanupTempDir()
+
+
+@pytest.mark.parametrize(("testModulePath", "testConfigPath"),
+                            [
+                                ("testModules.dataclasses.loadCfg.respectsTypeOverride.primativeTypes",
+                                    "src/tests/testConfigs/dataclasses/loadCfg/respectsTypeOverride/primativeTypes.toml"),
+                                ("testModules.dataclasses.loadCfg.respectsTypeOverride.serializableTypes",
+                                    "src/tests/testConfigs/dataclasses/loadCfg/respectsTypeOverride/serializableTypes.toml"),
+                            ])
+def test_loadCfg_respectsTypeOverride(testModulePath, testConfigPath):
+    testModule = importlib.import_module(testModulePath)
+    with open(testConfigPath, "r") as f:
+        testConfigValues = tomlkit.loads(f.read())
+
+    # Make sure at least one field in the config is a SerializableDataClass
+    cfgHasDataClass = False
+    typeOverriddenFields: Dict[str, Dict[str, typeChecking.TypeHint]] = {}
+
+    for varName, setValue in testConfigValues.items():
+        if not isinstance(setValue, AbstractTable): continue
+
+        defaultValue = getattr(testModule, varName)
+        if isinstance(defaultValue, carica.models.SerializableDataClass):
+            cfgHasDataClass = True
+
+            # Make sure the test config actually changes something
+            # and make sure the table contains a type-overridden field
+            for fieldName, fieldValue in setValue.items():
+                if fieldValue != getattr(defaultValue, fieldName) and defaultValue._fieldTypeIsOverridden(fieldName):
+                    if varName not in typeOverriddenFields: typeOverriddenFields[varName] = {}
+                    typeOverriddenFields[varName].update({fieldName: defaultValue._overriddenTypeOfFieldNamed(fieldName)})
+
+    if not cfgHasDataClass:
+        raise ValueError("Functionality not tested - no SerializableDataClass detected")
+    if not typeOverriddenFields:
+        raise ValueError("Functionality not tested - no SerializableDataClass field value changed by config file, or no field type overriden in config module")
+
+    carica.loadCfg(testModule, testConfigPath)
+
+    # Make sure the config values were loaded in
+    for varName, overriddenFields in typeOverriddenFields.items():
+        loadedVar = getattr(testModule, varName)
+        for fieldName, fieldType in overriddenFields.items():
+            assert isinstance(getattr(loadedVar, fieldName), fieldType)

@@ -456,15 +456,13 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
                 log(f"[WARNING] Ignoring unrecognised config variable name: {varName}")
 
         else:
-            # Get default value for variable
-            default = defaults[varName].value
+            # Get the type of the default value (or the type override) for this variable
             defaultType = defaults[varName].loadedType
 
             # Get the value for the variable that is defined in the config file
-            newValue: Any
             # This check ignores any config attributes that do not have a value, for example comments and whitespace.
             if isinstance(config[varName], _TKItemWithValue):
-                newValue = cast(_TKItemWithValue, config[varName]).value
+                newValue: Any = cast(_TKItemWithValue, config[varName]).value
             else:
                 continue
 

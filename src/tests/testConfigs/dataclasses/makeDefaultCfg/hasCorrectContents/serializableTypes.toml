@@ -1,3 +1,2 @@
-[testVar]
 [testVar.myField]
 myField = "test"
