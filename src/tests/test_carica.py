@@ -7,7 +7,7 @@ import importlib
 import os
 import shutil
 import tomlkit
-from tomlkit.items import container
+from tomlkit import container
 
 
 TESTS_TEMP_DIR = "testsTemp"
