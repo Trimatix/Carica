@@ -13,6 +13,12 @@ class _DeserializedTypeOverrideProxy(ObjectProxy):
         super().__init__(wrapped)
         self._self__carica_uninitialized_type__ = typeOverride
 
+    def __repr__(self):
+        inner = repr(self.__wrapped__)
+        if inner.endswith(">"):
+            return f"{inner[:-1]}[Carica-TypeOverride-Proxy]>"
+        return f"<{inner}[CaricaTypeOverrideProxy]>"
+
 T = TypeVar("T")
 def TypeOverride(override: TypeHint, defaultValue: T) -> T:
     return cast(T, _DeserializedTypeOverrideProxy(defaultValue, override))
