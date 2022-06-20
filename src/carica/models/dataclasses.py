@@ -1,6 +1,6 @@
 from dataclasses import Field, dataclass, _MISSING_TYPE, fields
-from carica.interface import SerializableType, ISerializable, PrimativeType, primativeTypesTuple, SerializesToDict
-from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable, _DeserializedTypeOverrideProxy
+from carica.interface import SerializableType, PrimativeType, primativeTypesTuple, SerializesToDict
+from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable, _DeserializedTypeOverrideProxy, _CallableDeserializedTypeOverrideProxy
 from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log
 from carica import exceptions
 import typing
@@ -307,8 +307,10 @@ class SerializableDataClass(SerializesToDict):
         :rtype: type
         """
         f = cls._getFields()[fieldName]
-        if isinstance(f.default, _DeserializedTypeOverrideProxy):
-            return f.default._self__carica_uninitialized_type__
+        if cls._fieldTypeIsOverridden(fieldName):
+            if isinstance(f.default_factory, _CallableDeserializedTypeOverrideProxy):
+                return cast(_CallableDeserializedTypeOverrideProxy, f.default_factory)._self__carica_uninitialized_type__
+            return cast(_DeserializedTypeOverrideProxy, f.default)._self__carica_uninitialized_type__
         return f.type
 
 
@@ -320,7 +322,8 @@ class SerializableDataClass(SerializesToDict):
         :rtype: type
         """
         f = cls._getFields()[fieldName]
-        return isinstance(f.default, _DeserializedTypeOverrideProxy)
+        return isinstance(f.default, _DeserializedTypeOverrideProxy) or \
+                isinstance(f.default_factory, _CallableDeserializedTypeOverrideProxy)
 
 
     @classmethod

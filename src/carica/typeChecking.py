@@ -1,10 +1,10 @@
-from typing import Any, Iterable, List, Mapping, TypeVar, Union, cast
+from typing import Any, Iterable, List, Mapping, TypeVar, Union, cast, Callable
 # ignoring a warning here because private type _BaseGenericAlias can't be imported right now.
 # it is a necessary import to unify over user-defined and special generics.
 from typing import _BaseGenericAlias # type: ignore
 from carica.interface import serializableTypesTuple, primativeTypesTuple
 from carica import exceptions
-from wrapt import ObjectProxy
+from wrapt import ObjectProxy, CallableObjectProxy
 
 TypeHint = Union[type, _BaseGenericAlias]
 
@@ -19,8 +19,12 @@ class _DeserializedTypeOverrideProxy(ObjectProxy):
             return f"{inner[:-1]}[Carica-TypeOverride-Proxy]>"
         return f"<{inner}[CaricaTypeOverrideProxy]>"
 
+class _CallableDeserializedTypeOverrideProxy(_DeserializedTypeOverrideProxy, CallableObjectProxy): pass
+
 T = TypeVar("T")
 def TypeOverride(override: TypeHint, defaultValue: T) -> T:
+    if isinstance(defaultValue, Callable):
+        return cast(T, _CallableDeserializedTypeOverrideProxy(defaultValue, override))
     return cast(T, _DeserializedTypeOverrideProxy(defaultValue, override))
 
 def objectIsObjectIterable(o: Any) -> bool:

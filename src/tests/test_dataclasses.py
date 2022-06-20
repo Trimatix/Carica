@@ -131,6 +131,8 @@ def test_makeDefaultCfg_rejectsInvalid(testModulePath, expectedException):
                                     "src/tests/testConfigs/dataclasses/loadCfg/respectsTypeOverride/primativeTypes.toml"),
                                 ("testModules.dataclasses.loadCfg.respectsTypeOverride.serializableTypes",
                                     "src/tests/testConfigs/dataclasses/loadCfg/respectsTypeOverride/serializableTypes.toml"),
+                                ("testModules.dataclasses.loadCfg.respectsTypeOverride.mutableTypes",
+                                    "src/tests/testConfigs/dataclasses/loadCfg/respectsTypeOverride/mutableTypes.toml")
                             ])
 def test_loadCfg_respectsTypeOverride(testModulePath, testConfigPath):
     testModule = importlib.import_module(testModulePath)
@@ -166,4 +168,6 @@ def test_loadCfg_respectsTypeOverride(testModulePath, testConfigPath):
     for varName, overriddenFields in typeOverriddenFields.items():
         loadedVar = getattr(testModule, varName)
         for fieldName, fieldType in overriddenFields.items():
-            assert isinstance(getattr(loadedVar, fieldName), fieldType)
+            # This will only test at a shallow level
+            # i.e generic parameters are not tested
+            assert isinstance(getattr(loadedVar, fieldName), fieldType if not hasattr(fieldType, "__origin__") else fieldType.__origin__) # type: ignore
