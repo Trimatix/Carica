@@ -1,7 +1,7 @@
 from dataclasses import Field, dataclass, _MISSING_TYPE, fields
 from carica.interface import SerializableType, PrimativeType, primativeTypesTuple, SerializesToDict
 from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable, _DeserializedTypeOverrideProxy, _CallableDeserializedTypeOverrideProxy
-from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log
+from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log, _serialize
 from carica import exceptions
 import typing
 import traceback
@@ -354,27 +354,14 @@ class SerializableDataClass(SerializesToDict):
         return False
 
     
-    def serialize(self, deepTypeChecking: bool = False, **kwargs) -> Dict[str, PrimativeType]:
+    def serialize(self, **kwargs) -> Dict[str, PrimativeType]:
         """Serialize this object into a dictionary, to be recreated completely.
 
-        :param bool deepTypeChecking: Whether to ensure serializability of member objects recursively (Default False)
         :return: A dictionary mapping field names to serialized values
         :rtype: Dict[str, PrimativeType]
         """
-        data: Dict[str, PrimativeType] = {}
 
-        for k in self._getFields():
-            v = getattr(self, k)
-            if isinstance(v, SerializableType):
-                data[k] = v.serialize(**kwargs)
-            elif not objectIsShallowSerializable(v):
-                raise exceptions.NonSerializableObject(v, extra=f"Field '{k}' is of non-serializable type: {type(v).__name__}")
-            elif deepTypeChecking and not objectIsDeepSerializable(v):
-                raise exceptions.NonSerializableObject(v, extra=f"Field '{k}' has a non-serializable member object")
-            else:
-                data[k] = v
-
-        return data
+        return {k: _serialize(v) for k, v in self._fieldItems()}
 
 
     @classmethod
