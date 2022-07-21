@@ -317,9 +317,7 @@ Projects which prefer strong typing may implement the `carica.ISerializable` int
 
 *cfg.py*
 ```py
-from carica import ISerializable
-
-class MySerializableType(ISerializable):
+class MySerializableType:
     def __init__(self, myField):
         self.myField = myField
 
