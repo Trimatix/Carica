@@ -361,7 +361,7 @@ class SerializableDataClass(SerializesToDict):
         :rtype: Dict[str, PrimativeType]
         """
 
-        return {k: _serialize(v) for k, v in self._fieldItems()}
+        return {k: _serialize(v, [k]) for k, v in self._fieldItems()}
 
 
     @classmethod
