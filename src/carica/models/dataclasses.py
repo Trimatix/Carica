@@ -1,5 +1,5 @@
 from dataclasses import Field, dataclass, _MISSING_TYPE, fields
-from carica.interface import SerializableType, PrimativeType, primativeTypesTuple, SerializesToDict
+from carica.interface import SerializableType, PrimativeType, primativeTypes, SerializesToDict
 from carica.typeChecking import objectIsShallowSerializable, objectIsDeepSerializable, _DeserializedTypeOverrideProxy, _CallableDeserializedTypeOverrideProxy
 from carica.carica import BadTypeHandling, BadTypeBehaviour, ErrorHandling, VariableTrace, log, _serialize
 from carica import exceptions
@@ -183,7 +183,7 @@ def _deserializeField(fieldName: str, fieldType: Union[type, _BaseGenericAlias, 
                 return serializedValue
 
         # Otherwise do nothing
-        elif issubclass(fieldType, primativeTypesTuple):
+        elif issubclass(fieldType, primativeTypes):
             if isinstance(serializedValue, fieldType):
                 return _handleTypeCasts(serializedValue, fieldName, fieldType, c_badTypeHandling)
             raise TypeError(f"Expected type of {fieldType} for field {fieldName}, " \
@@ -383,7 +383,8 @@ class SerializableDataClass(SerializesToDict):
             data[k] = _deserializeField(k, cls._overriddenTypeOfFieldNamed(k), v, c_variableTrace=c_variableTrace + [k], 
                                         deserializeSerializable=deserializeValues, **kwargs)
 
-        constructorArgs = inspect.signature(cls.__init__).parameters
+        # TODO: Unknown pyright warning - this code functions as expected
+        constructorArgs = inspect.signature(cls.__init__).parameters # type: ignore[reportGeneralTypeIssues]
         classKwargs = {k: v for k, v in kwargs.items() if k in constructorArgs}
 
         return cls(**data, **classKwargs)

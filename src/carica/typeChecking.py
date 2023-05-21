@@ -2,7 +2,7 @@ from typing import Any, Iterable, List, Mapping, TypeVar, Union, cast, Callable
 # ignoring a warning here because private type _BaseGenericAlias can't be imported right now.
 # it is a necessary import to unify over user-defined and special generics.
 from typing import _BaseGenericAlias # type: ignore
-from carica.interface import serializableTypesTuple, primativeTypesTuple
+from carica.interface import serializableTypes, primativeTypes
 from carica import exceptions
 from wrapt import ObjectProxy, CallableObjectProxy
 
@@ -56,7 +56,7 @@ def objectIsShallowPrimative(o: Any) -> bool:
     :return: True if o itself is a primative type, False otherwise
     :rtype: bool
     """
-    return isinstance(o, primativeTypesTuple)
+    return isinstance(o, primativeTypes)
 
 
 def objectIsDeepPrimative(o: Any) -> bool:
@@ -119,7 +119,7 @@ def objectIsShallowSerializable(o: Any) -> bool:
     :return: True if o itself is a primative or serializable type, False otherwise
     :rtype: bool
     """
-    return isinstance(o, serializableTypesTuple)
+    return isinstance(o, serializableTypes)
 
 
 def objectIsDeepSerializable(o: Any) -> bool:
