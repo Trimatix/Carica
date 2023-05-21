@@ -74,7 +74,7 @@ class ConfigVariable:
 
 @runtime_checkable
 class _TKItemWithValue(Protocol):
-    def value(self): ...
+    def unwrap(self) -> Any: ...
 
 
 def _partialModuleVariables(module: ModuleType) -> Dict[str, ConfigVariable]:
@@ -460,16 +460,16 @@ def loadCfg(cfgModule: ModuleType, cfgFile: str, badTypeHandling: BadTypeHandlin
             # Get the type of the default value (or the type override) for this variable
             defaultType = defaults[varName].loadedType
 
-            # Get the value for the variable that is defined in the config file
-            # This check ignores any config attributes that do not have a value, for example comments and whitespace.
-            if isinstance(config[varName], _TKItemWithValue):
-                newValue: Any = cast(_TKItemWithValue, config[varName]).value
-            else:
-                continue
+            newValue = config[varName]
 
             # Convert incompatible types, e.g TOMLDocument
             if isinstance(newValue, INCOMPATIBLE_TOML_TYPES):
                 newValue = convertIncompatibleTomlTypes(newValue)
+
+            # Get the value for the variable that is defined in the config file
+            # This check ignores any config attributes that do not have a value, for example comments and whitespace.
+            if isinstance(config[varName], _TKItemWithValue):
+                newValue: Any = cast(_TKItemWithValue, config[varName]).unwrap()
 
             # deserialize serializable variables
             if issubclass(defaultType, SerializableType):
