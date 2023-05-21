@@ -68,7 +68,7 @@ class ISerializable(ABC):
     
 
 # All types which are themselves primative, or can be serialized into primative types, as a shallow set
-serializableTypes = tuple(t for t in primativeTypes) + (SerializableType,)
+serializableTypes: Tuple[Type] = tuple(t for t in primativeTypes) + (SerializableType,)
 
 TClass = TypeVar("TClass")
 TSerialized = TypeVar("TSerialized", bound=PrimativeType)
