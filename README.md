@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/Trimatix/Carica/actions"
     ><img
-      src="https://img.shields.io/github/workflow/status/GOF2BountyBot/GOF2BountyBot/BASED"
+      src="https://img.shields.io/github/actions/workflow/status/Trimatix/Carica/testing.yml?branch=main"
       alt="GitHub Actions workflow status"
   /></a>
   <a href="https://github.com/Trimatix/Carica/projects/1?card_filter_query=label%3Abug"
