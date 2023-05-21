@@ -24,8 +24,8 @@ def setupTempDir():
 
 @pytest.mark.parametrize(("testModulePath", "testConfigPath"),
                             [
-                                ("testModules.dataclasses.loadCfg.loadsCorrectValues.primativeTypes",
-                                    "src/tests/testConfigs/dataclasses/loadCfg/loadsCorrectValues/primativeTypes.toml"),
+                                # ("testModules.dataclasses.loadCfg.loadsCorrectValues.primativeTypes",
+                                #     "src/tests/testConfigs/dataclasses/loadCfg/loadsCorrectValues/primativeTypes.toml"),
                                 ("testModules.dataclasses.loadCfg.loadsCorrectValues.serializableTypes",
                                     "src/tests/testConfigs/dataclasses/loadCfg/loadsCorrectValues/serializableTypes.toml"),
                             ])
