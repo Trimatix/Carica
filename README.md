@@ -34,10 +34,10 @@
       src="https://img.shields.io/pypi/pyversions/Carica.svg"
       alt="Minimum supported Python version"
   /></a>
-  <a href="https://github.com/Trimatix/Carica/blob/master/LICENSE"
+  <a href="https://pepy.tech/project/carica"
     ><img
-      src="https://img.shields.io/github/license/Trimatix/Carica.svg"
-      alt="License"
+      src="https://static.pepy.tech/badge/carica"
+      alt="Total PyPi Downloads"
 </p>
 <p align="center">
   <a href="https://sonarcloud.io/dashboard?id=Trimatix_Carica"
