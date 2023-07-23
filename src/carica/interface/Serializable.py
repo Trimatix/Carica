@@ -73,7 +73,7 @@ serializableTypes: Tuple[Type] = tuple(t for t in primativeTypes) + (Serializabl
 TClass = TypeVar("TClass")
 TSerialized = TypeVar("TSerialized", bound=PrimativeType)
 
-class SerializesToType(Protocol, SerializableType, Generic[TSerialized]):
+class SerializesToType(SerializableType, Generic[TSerialized], Protocol):
     def serialize(self, **kwargs) -> TSerialized: ...
 
     @classmethod
