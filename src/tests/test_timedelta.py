@@ -1,7 +1,8 @@
 from datetime import timedelta
-from typing import Callable, Dict
+from typing import Callable, Dict, cast
 import pytest
 from carica.models import SerializableTimedelta
+from carica.models.timedelta import SerializedTimedelta
 from random import randint
 import random
 
@@ -21,12 +22,12 @@ key_tdGetters: Dict[str, Callable[[timedelta], int]] = {
 }
 
 
-def distributeSerializedData(data: Dict[str, int]) -> Dict[str, int]:
+def distributeSerializedData(data: SerializedTimedelta) -> SerializedTimedelta:
     """This will flatten out all of the values in data, pushing times up to the largest 'bases' they can fit in
     This creates a minimal dict for replacing the same data
     """
     td = timedelta(**data)
-    return {k: key_tdGetters[k](td) for k in key_tdGetters}
+    return cast(SerializedTimedelta, {k: key_tdGetters[k](td) for k in key_tdGetters})
 
 
 def randomTestData(mini=1, maxi=1000):
@@ -46,7 +47,7 @@ def randomTestData(mini=1, maxi=1000):
         milliseconds=milliseconds,
         microseconds=microseconds
     )
-    data = {
+    data: SerializedTimedelta = {
         "weeks": weeks,
         "days": days,
         "hours": hours,
@@ -111,7 +112,7 @@ sampleData += [randomTestData() for _ in range(numRandomItems)]
 
 
 @pytest.mark.parametrize(("testTD", "expectedData"), sampleData)
-def test_timedelta_serialize_hasCorrectContents(testTD: SerializableTimedelta, expectedData: Dict[str, int]):
+def test_timedelta_serialize_hasCorrectContents(testTD: SerializableTimedelta, expectedData: SerializedTimedelta):
     serialized = testTD.serialize()
     expectedData = distributeSerializedData(expectedData)
     for k in key_tdGetters:
@@ -123,7 +124,7 @@ def test_timedelta_serialize_hasCorrectContents(testTD: SerializableTimedelta, e
 
 
 @pytest.mark.parametrize(("testData", "expectedTD"), [(data, td) for td, data in sampleData])
-def test_timedelta_deserialize_hasCorrectContents(testData: str, expectedTD: SerializableTimedelta):
+def test_timedelta_deserialize_hasCorrectContents(testData: SerializedTimedelta, expectedTD: SerializableTimedelta):
     deserialized = SerializableTimedelta.deserialize(testData)
     assert deserialized == expectedTD
     return True
